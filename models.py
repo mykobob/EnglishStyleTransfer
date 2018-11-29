@@ -6,6 +6,8 @@ from torch.autograd import Variable as Var
 
 import numpy as np
 
+device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+#device = torch.device("cuda:0" if False and torch.cuda.is_available() else "cpu")
 
 # Embedding layer that has a lookup table of symbols that is [full_dict_size x input_dim]. Includes dropout.
 # Works for both non-batched and batched inputs
@@ -93,27 +95,76 @@ class RNNEncoder(nn.Module):
             h_t = (h, c)
         return (output, context_mask, h_t)
 
-
 class RNNDecoder(nn.Module):
-    def __init__(self, input_size, hidden_size, output_size):
+
+    def __init__(self, input_size, encoder_hidden_size, hidden_size, output_size, dropout):
         super(RNNDecoder, self).__init__()
         self.input_size = input_size
         self.hidden_size = hidden_size
-        self.output_size = output_size
-        self.reduce_layer = nn.Linear(hidden_size, output_size, bias=True)
-        self.rnn = nn.LSTM(input_size, hidden_size, num_layers=1, batch_first=True)
+        self.encoder_hidden_size = encoder_hidden_size
+        self.attention_hidden_size = encoder_hidden_size + hidden_size
+        self.rnn = nn.LSTM(input_size, hidden_size, num_layers=1, batch_first=True,
+                           dropout=dropout)
+        self.hidden2vocab = nn.Linear(self.attention_hidden_size, output_size, bias=True)
+        # self.hidden2vocab = nn.Linear(self.hidden_size, output_size, bias=True)
+
+        self.attention_mat = nn.Bilinear(hidden_size, encoder_hidden_size, 1)
+
         self.init_weight()
 
+    # Initializes weight matrices using Xavier initialization
     def init_weight(self):
+        nn.init.xavier_uniform_(self.hidden2vocab.weight)
+        nn.init.xavier_uniform_(self.attention_mat.weight)
         nn.init.xavier_uniform_(self.rnn.weight_hh_l0, gain=1)
         nn.init.xavier_uniform_(self.rnn.weight_ih_l0, gain=1)
         nn.init.constant_(self.rnn.bias_hh_l0, 0)
         nn.init.constant_(self.rnn.bias_ih_l0, 0)
-        torch.nn.init.xavier_uniform_(self.reduce_layer.weight)
 
-    def forward(self, emb_input, hidden):
-        output, h = self.rnn(emb_input, hidden)
-        output = self.reduce_layer(output.squeeze(0))
-        output = F.log_softmax(output, dim=1)
-        return output, h
+    def init_hidden(self):
+        return (torch.zeros(1, 1, self.hidden_size),
+                torch.zeros(1, 1, self.hidden_size))
 
+    def get_output_size(self):
+        return self.hidden_size
+
+    def sent_lens_to_mask(self, lens, max_length):
+        return torch.from_numpy(np.asarray([[1 if j < lens.data[i].item() else 0 for j in range(0, max_length)] for i in range(0, lens.shape[0])]))
+
+    def attention_function(self, dec_output, src_hidden):
+        #print('dec_output', dec_output.size())
+        #print('src_hidden', src_hidden.size())
+        return self.attention_mat(dec_output, src_hidden)
+
+    def calculate_weights(self, dec_output, src_sentence_hidden):
+        num_src_words = src_sentence_hidden.size()[0]
+        dup_dec_output = torch.cat([dec_output] * num_src_words)
+        #weights = torch.zeros((1, num_src_words)).float().to(device)
+        weights = self.attention_function(dup_dec_output, src_sentence_hidden)
+        #for i in range(num_src_words):
+        #    src_hidden = src_sentence_hidden[i, :].unsqueeze(0)
+        #    weights[0, i] = self.attention_function(dec_output, src_hidden) # single value
+        return torch.t(weights)
+
+    def word_embed_weights(self, dec_output, src_sentence_hidden):
+        weights = self.calculate_weights(dec_output, src_sentence_hidden)
+        normalized_weights = F.softmax(weights, dim=1)
+        return normalized_weights
+
+    def get_attention(self, dec_output, src_sentence_hidden):
+        word_weights = self.word_embed_weights(dec_output, src_sentence_hidden)
+        return torch.mm(word_weights, src_sentence_hidden)
+
+    def forward(self, input_hidden, embedded_word, src_sentence_embed):
+        output, self.hidden = self.rnn(embedded_word, input_hidden)
+        output = output.squeeze(0)
+
+        src_sentence_embed = src_sentence_embed.squeeze(1)
+        attention = self.get_attention(output, src_sentence_embed)
+        hidden_layer_input = torch.cat((attention, output), dim=1)
+        # hidden_layer_input = output
+
+        vocab_output = self.hidden2vocab(hidden_layer_input)
+        vocab_prob = F.log_softmax(vocab_output, dim=1).squeeze(0)
+        #print('vocab_prob', vocab_prob.size())
+        return vocab_prob

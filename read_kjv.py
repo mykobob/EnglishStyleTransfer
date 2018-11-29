@@ -4,12 +4,8 @@
 from collections import defaultdict
 
 
-def read_kjv(file_name):
-    """
-    Returns dict of entire King James Version from .csv file
-    { chapter_name : { chapter_idx : verses_list_start_with_1 } }
-    """
-    all_books = ["Genesis", "Exodus", "Leviticus", "Numbers", "Deuteronomy",
+def all_books():
+    books_list = ["Genesis", "Exodus", "Leviticus", "Numbers", "Deuteronomy",
                  "Joshua", "Judges", "Ruth", "1 Samuel", "2 Samuel", "1 Kings",
                  "2 Kings", "1 Chronicles", "2 Chronicles", "Ezra", "Nehemiah",
                  "Esther", "Job", "Psalm", "Proverbs", "Ecclesiastes",
@@ -22,16 +18,25 @@ def read_kjv(file_name):
                  "1 Timothy", "2 Timothy", "Titus", "Philemon", "Hebrews", "James",
                  "1 Peter", "2 Peter", "1 John", "2 John", "3 John", "Jude",
                  "Revelation"]
+    return books_list
 
+
+def read_kjv(file_name):
+    """
+    Returns dict of entire King James Version from .csv file
+    { chapter_name : { chapter_idx : verses_list_start_with_1 } }
+    """
+
+    books = all_books()
     kjv = {}
-    for book in all_books:
+    for book in books:
         kjv[book] = defaultdict(list)
     print()
 
     with open(file_name) as kjv_lines:
         for line in kjv_lines:
             line = line.replace('"', "").strip().split(",")
-            this_book = all_books[int(line[1]) - 1]
+            this_book = books[int(line[1]) - 1]
             # print("Current book", this_book)
             this_chapter = int(line[2])
             # print("Current chapter", this_chapter)
