@@ -53,6 +53,6 @@ def read_kjv(file_name):
 
 
 if __name__ == '__main__':
-    kjv = read_kjv("t_kjv.csv")
-    print(kjv["Revelation"][22])
+    kjv = read_kjv("data/kjv.csv")
+    print(kjv["John"][3][15])
 
