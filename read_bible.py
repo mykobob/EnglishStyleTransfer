@@ -65,15 +65,16 @@ def read_esv(src_text):
     longest = 0
     with open(src_text) as f:
         text = json.load(f)
-        info = defaultdict(lambda: defaultdict(list))
+        info = defaultdict(lambda: defaultdict(dict))
         for verse_info in text:
             book_name = verse_info['book_name']
             chap_num = int(verse_info['chapter_id'])
             verse_text = verse_info['verse_text']
+            verse_id = int(verse_info['verse_id'])
 
             tokenized = tokenize(verse_text)
             longest = max(longest, len(tokenized))
-            info[book_name][chap_num].append(tokenized)
+            info[book_name][chap_num][verse_id] = tokenized
     print(f'longest esv is {longest}')
     return info
 
@@ -82,4 +83,4 @@ if __name__ == '__main__':
     print(kjv["John"][3][16])
     
     esv = read_esv('data/esv.txt')
-    print(esv["John"][3][2])
+    print(esv["John"][3][16])
