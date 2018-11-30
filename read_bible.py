@@ -2,7 +2,8 @@
 # { chapter_name : { chapter_idx : verses_list_start_with_1 } }
 
 from collections import defaultdict
-
+import json
+import re
 
 def all_books():
     books_list = ["Genesis", "Exodus", "Leviticus", "Numbers", "Deuteronomy",
@@ -20,6 +21,8 @@ def all_books():
                  "Revelation"]
     return books_list
 
+def tokenize(verse_text):
+    return re.findall(r"[\w']+|[-.,!?:;()]", verse_text)
 
 def read_kjv(file_name):
     """
@@ -33,15 +36,22 @@ def read_kjv(file_name):
         kjv[book] = defaultdict(list)
     print()
 
+    non_alphanumeric = {}
+    longest = 0
     with open(file_name) as kjv_lines:
         for line in kjv_lines:
-            line = line.replace('"', "").strip().split(",")
+            line = line.replace('"', "").strip().split(",", 4)
             this_book = books[int(line[1]) - 1]
             # print("Current book", this_book)
             this_chapter = int(line[2])
             # print("Current chapter", this_chapter)
-            kjv[this_book][this_chapter].append(",".join(line[4:]))
-            this_verse = len(kjv[this_book][this_chapter])
+            verse_text = line[4]
+
+#             tokenized = re.findall(r"[\w']+|[-.,!?:;()]", verse_text)
+            tokenized = tokenize(verse_text)
+            kjv[this_book][this_chapter].append(tokenized)
+#             longest = max(longest, max([len(verse) for verse in kjv[this_book][this_chapter]]))
+#             this_verse = len(kjv[this_book][this_chapter])
             # This inserts an index at chapter -1, so be careful using it to debug
             # if this_verse == 1:
             #     print("Starting next chapter")
@@ -49,10 +59,28 @@ def read_kjv(file_name):
             #     input()
             # print(kjv[this_book][this_chapter])
 
+    print('longest verse is', longest)
     return kjv
 
+def read_esv(src_text):
+    # Get Book with number of chapters and number of verses
+    # dict of book name to array of numbers for # of verses
+    with open(src_text) as f:
+        text = json.load(f)
+        info = defaultdict(lambda: defaultdict(list))
+        for verse_info in text:
+            book_name = verse_info['book_name']
+            chap_num = int(verse_info['chapter_id'])
+            verse_text = verse_info['verse_text']
+            tokenized = tokenize(verse_text)
+            info[book_name][chap_num].append(tokenized)
+    
+    return info
 
 if __name__ == '__main__':
     kjv = read_kjv("data/kjv.csv")
-    print(kjv["John"][3][15])
-
+    print(kjv["John"][15][4])
+    
+    esv = read_esv('data/esv.txt')
+    print(esv["John"][15][4])
+      
