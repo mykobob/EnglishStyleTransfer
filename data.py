@@ -48,14 +48,16 @@ EOV_SYMBOL = "<EOV>"
 
 
 # Reads the training, dev, and test data from the corresponding files.
-def load_datasets(kjv_path, esv_path):
+def load_bibles(kjv_path, esv_path):
     all_kjv = read_kjv(kjv_path)
     all_esv = read_esv(esv_path)
-#     train_raw = load_dataset(train_path, domain=domain)
-#     dev_raw = load_dataset(dev_path, domain=domain)
-#     test_raw = load_dataset(test_path, domain=domain)
     return all_kjv, all_esv
 
+def load_datasets(train_path, dev_path, test_path):
+    train_verses = load_dataset(train_path)
+    dev_verses = load_dataset(dev_path)
+    test_verses = load_dataset(test_path)
+    return train_verses, dev_verses, test_verses
 
 # Whitespace tokenization
 def tokenize(x):
@@ -66,24 +68,31 @@ def index(x_tok, indexer):
     return [indexer.index_of(xi) if indexer.index_of(xi) >= 0 else indexer.index_of(UNK_SYMBOL) for xi in x_tok]
 
 
-def index_data(data, input_indexer, output_indexer, example_len_limit):
+def index_data(src_text, dest_text, input_indexer, output_indexer, example_len_limit):
     data_indexed = []
-    for (x, y) in data:
-        x_tok = tokenize(x)
-        y_tok = tokenize(y)[0:example_len_limit]
-        data_indexed.append(Example(x, x_tok, index(x_tok, input_indexer), y, y_tok,
-                                          index(y_tok, output_indexer) + [output_indexer.get_index(EOS_SYMBOL)]))
+    for book_name, chapter_num, verse_num in data:
+        x_tok = src_text[book_name][chapter_num][verse_num]
+        y_tok = dest_text[book_name][chapter_num][verse_num][0:example_len_limit]
+        data_indexed.append(Example(' '.join(x_tok), x_tok, index(x_tok, input_indexer), ' '.join(y_tok), y_tok,
+                                          index(y_tok, output_indexer)))
     return data_indexed
 
 
 # Indexes train and test datasets where all words occurring less than or equal to unk_threshold times are
 # replaced by UNK tokens.
-def index_datasets(train_data, dev_data, test_data, example_len_limit, unk_threshold=0.0):
+
+# Input is 
+    # KJV/ESV dicts of {book_name -> {chapter_num -> {verse_num: -> [character tokens]}}}
+    # train/dev/test set information
+# Output should be 
+    # a list of Example objects for train/dev/test
+def index_datasets(src_text, dest_text, train, dev, test, example_len_limit, unk_threshold=0.0):
     input_word_counts = Counter()
     # Count words and build the indexers
-    for (x, y) in train_data:
-        for word in tokenize(x):
+    for book_name, chapter_num, verse_num in train:
+        for token in src_text[book_name][chapter_num][verse_num]:
             input_word_counts.increment_count(word, 1.0)
+            
     input_indexer = Indexer()
     output_indexer = Indexer()
     # Reserve 0 for the pad symbol for convenience
@@ -97,8 +106,8 @@ def index_datasets(train_data, dev_data, test_data, example_len_limit, unk_thres
         if input_word_counts.get_count(word) > unk_threshold + 0.5:
             input_indexer.get_index(word)
     # Index all output tokens in train
-    for (x, y) in train_data:
-        for y_tok in tokenize(y):
+    for book_name, chapter_num, verse_num in train:
+        for token in dest_text[book_name][chapter_num][verse_num]:
             output_indexer.get_index(y_tok)
     # Index things
     train_data_indexed = index_data(train_data, input_indexer, output_indexer, example_len_limit)

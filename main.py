@@ -151,12 +151,6 @@ def split_dataset(data, training, dev, test):
 
 
 def train_model_encdec(data, input_indexer, output_indexer, args):
-    # Grab x verses from a dataset as training, x as dev, and x as test
-    num_train = 80
-    num_dev = 10
-    num_test = 10
-    train_list, dev_list, test_list = split_dataset(data['src_text'], num_train, num_dev, num_test)
-
     print(args)
     # Sort in descending order by x_indexed, essential for pack_padded_sequence
     train_data.sort(key=lambda ex: len(ex.x_indexed), reverse=True)
@@ -280,8 +274,10 @@ if __name__ == '__main__':
     # Load the training and test data
 
 # TODO rewrite loading data methods
-    train, dev, test = load_datasets(args.train_path, args.dev_path, args.test_path, domain=args.domain)
-    train_data_indexed, dev_data_indexed, test_data_indexed, input_indexer, output_indexer = index_datasets(train, dev,
+    kjv, esv = load_bibles(args.kjv, args.esv)
+    train, dev, test = load_datasets(args.train_path, args.dev_path, args.test_path)
+    
+    train_data_indexed, dev_data_indexed, test_data_indexed, input_indexer, output_indexer = index_datasets(kjv, esv, train, dev,
                                                                                                             test, args.decoder_len_limit)
     print("%i train exs, %i dev exs, %i input types, %i output types" % (
     len(train_data_indexed), len(dev_data_indexed), len(input_indexer), len(output_indexer)))
