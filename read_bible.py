@@ -1,5 +1,5 @@
-# Read King James Version into a dict of
-# { chapter_name : { chapter_idx : verses_list_start_with_1 } }
+# read_bible.py
+# Provides data reading utilities
 
 from collections import defaultdict
 import json
@@ -27,7 +27,7 @@ def tokenize(verse_text):
 def read_kjv(file_name):
     """
     Returns dict of entire King James Version from .csv file
-    { chapter_name : { chapter_idx : verses_list_start_with_1 } }
+    { chapter_name : { chapter_idx : { verse_idx : list_of_cleaned_tokens } } }
     """
 
     books = all_books()
@@ -83,4 +83,3 @@ if __name__ == '__main__':
     
     esv = read_esv('data/esv.txt')
     print(esv["John"][3][2])
-      
