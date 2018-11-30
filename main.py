@@ -125,8 +125,6 @@ class Seq2SeqSemanticParser(object):
 def split_dataset(data, training, dev, test):
     if training + dev + test != 100:
         raise Exception('Train, dev, and test must add up to 100%')
-        
-    required_verses = training + dev + test
     train_list = []
     dev_list = []
     test_list = []
@@ -134,13 +132,13 @@ def split_dataset(data, training, dev, test):
     for book in books:
         for chapter in data[book]:
             counter = 0
-            max_verses = len(data[book][chapter])
+            max_verses = len(data[book][chapter].keys())
             train_verses = int(training / 100. * max_verses)
             dev_verses = int(dev / 100. * max_verses)
-            test_verse = max_verses - train_verses - dev_verses
+            test_verses = max_verses - train_verses - dev_verses
             
             samples = random.sample(range(0, max_verses), max_verses)
-            for i in range(counter, counter + train_verse):
+            for i in range(counter, counter + train_verses):
                 train_list.append((book, chapter, samples[i]))
             counter += training
             for i in range(counter, counter + dev_verses):

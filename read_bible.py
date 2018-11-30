@@ -33,23 +33,20 @@ def read_kjv(file_name):
     books = all_books()
     kjv = {}
     for book in books:
-        kjv[book] = defaultdict(list)
+        kjv[book] = defaultdict(defaultdict)
     print()
 
-    non_alphanumeric = {}
-    longest = 0
+    # non_alphanumeric = {}
+    # longest = 0
     with open(file_name) as kjv_lines:
         for line in kjv_lines:
             line = line.replace('"', "").strip().split(",", 4)
             this_book = books[int(line[1]) - 1]
-            # print("Current book", this_book)
             this_chapter = int(line[2])
-            # print("Current chapter", this_chapter)
+            this_verse = int(line[3])
             verse_text = line[4]
-
-#             tokenized = re.findall(r"[\w']+|[-.,!?:;()]", verse_text)
             tokenized = tokenize(verse_text)
-            kjv[this_book][this_chapter].append(tokenized)
+            kjv[this_book][this_chapter][this_verse] = tokenized
 #             longest = max(longest, max([len(verse) for verse in kjv[this_book][this_chapter]]))
 #             this_verse = len(kjv[this_book][this_chapter])
             # This inserts an index at chapter -1, so be careful using it to debug
@@ -59,7 +56,7 @@ def read_kjv(file_name):
             #     input()
             # print(kjv[this_book][this_chapter])
 
-    print('longest verse is', longest)
+    # print('longest verse is', longest)
     return kjv
 
 def read_esv(src_text):
@@ -82,7 +79,7 @@ def read_esv(src_text):
 
 if __name__ == '__main__':
     kjv = read_kjv("data/kjv.csv")
-    print(kjv["John"][3][2])
+    print(kjv["John"][3][16])
     
     esv = read_esv('data/esv.txt')
     print(esv["John"][3][2])
