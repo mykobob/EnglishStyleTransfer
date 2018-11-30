@@ -22,7 +22,7 @@ def all_books():
     return books_list
 
 def tokenize(verse_text):
-    return re.findall(r"[\w']+|[-.,!?:;()]", verse_text)
+    return re.findall(r"[\w']+|[\"-.,!?:;()]", verse_text)
 
 def read_kjv(file_name):
     """
@@ -65,6 +65,7 @@ def read_kjv(file_name):
 def read_esv(src_text):
     # Get Book with number of chapters and number of verses
     # dict of book name to array of numbers for # of verses
+    longest = 0
     with open(src_text) as f:
         text = json.load(f)
         info = defaultdict(lambda: defaultdict(list))
@@ -72,15 +73,17 @@ def read_esv(src_text):
             book_name = verse_info['book_name']
             chap_num = int(verse_info['chapter_id'])
             verse_text = verse_info['verse_text']
+
             tokenized = tokenize(verse_text)
+            longest = max(longest, len(tokenized))
             info[book_name][chap_num].append(tokenized)
-    
+    print(f'longest esv is {longest}')
     return info
 
 if __name__ == '__main__':
     kjv = read_kjv("data/kjv.csv")
-    print(kjv["John"][15][4])
+    print(kjv["John"][3][2])
     
     esv = read_esv('data/esv.txt')
-    print(esv["John"][15][4])
+    print(esv["John"][3][2])
       

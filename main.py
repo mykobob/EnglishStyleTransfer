@@ -11,15 +11,10 @@ from utils import *
 
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
-
-# device = torch.device('cpu')
-
 def _parse_args():
     parser = argparse.ArgumentParser(description='main.py')
 
     # General system running and configuration options
-    parser.add_argument('--do_nearest_neighbor', dest='do_nearest_neighbor', default=False, action='store_true',
-                        help='run the nearest neighbor model')
 
     parser.add_argument('--train_path', type=str, default='data/geo_train.tsv', help='path to train data')
     parser.add_argument('--dev_path', type=str, default='data/geo_dev.tsv', help='path to dev data')
@@ -34,7 +29,7 @@ def _parse_args():
     parser.add_argument('--lr', type=float, default=.001)
     parser.add_argument('--batch_size', type=int, default=2, help='batch size')
     # 65 is all you need for GeoQuery
-    parser.add_argument('--decoder_len_limit', type=int, default=65, help='output length limit of the decoder')
+    parser.add_argument('--decoder_len_limit', type=int, default=105, help='output length limit of the decoder')
     parser.add_argument('--input_dim', type=int, default=100, help='input vector dimensionality')
     parser.add_argument('--output_dim', type=int, default=100, help='output vector dimensionality')
     parser.add_argument('--hidden_size', type=int, default=200, help='hidden state dimensionality')
@@ -127,57 +122,10 @@ class Seq2SeqSemanticParser(object):
 
         return ans
 
-
-# Takes the given Examples and their input indexer and turns them into a numpy array by padding them out to max_len.
-# Optionally reverses them.
-def make_padded_input_tensor(exs, input_indexer, max_len, reverse_input):
-    if reverse_input:
-        return np.array(
-            [[ex.x_indexed[len(ex.x_indexed) - 1 - i] if i < len(ex.x_indexed) else input_indexer.index_of(PAD_SYMBOL)
-              for i in range(0, max_len)]
-             for ex in exs])
-    else:
-        return np.array([[ex.x_indexed[i] if i < len(ex.x_indexed) else input_indexer.index_of(PAD_SYMBOL)
-                          for i in range(0, max_len)]
-                         for ex in exs])
-
-
-# Analogous to make_padded_input_tensor, but without the option to reverse input
-def make_padded_output_tensor(exs, output_indexer, max_len):
-    return np.array(
-        [[ex.y_indexed[i] if i < len(ex.y_indexed) else output_indexer.index_of(PAD_SYMBOL) for i in range(0, max_len)]
-         for ex in exs])
-
-
-# Runs the encoder (input embedding layer and encoder as two separate modules) on a tensor of inputs x_tensor with
-# inp_lens_tensor lengths.
-# x_tensor: batch size x sent len tensor of input token indices
-# inp_lens: batch size length vector containing the length of each sentence in the batch
-# model_input_emb: EmbeddingLayer
-# model_enc: RNNEncoder
-# Returns the encoder outputs (per word), the encoder context mask (matrix of 1s and 0s reflecting
-
-# E.g., calling this with x_tensor (0 is pad token):
-# [[12, 25, 0, 0],
-#  [1, 2, 3, 0],
-#  [2, 0, 0, 0]]
-# inp_lens = [2, 3, 1]
-# will return outputs with the following shape:
-# enc_output_each_word = 3 x 4 x dim, enc_context_mask = [[1, 1, 0, 0], [1, 1, 1, 0], [1, 0, 0, 0]],
-# enc_final_states = 3 x dim
-def encode_input_for_decoder(x_tensor, inp_lens_tensor, model_input_emb, model_enc):
-    input_emb = model_input_emb.forward(x_tensor)
-    (enc_output_each_word, enc_context_mask, enc_final_states) = model_enc.forward(input_emb, inp_lens_tensor)
-    enc_final_states_reshaped = (enc_final_states[0].unsqueeze(0), enc_final_states[1].unsqueeze(0))
-    return (enc_output_each_word, enc_context_mask, enc_final_states_reshaped)
-
-
-def prep_word_for_decoder(output_words, model_output_emb):
-    output_emb = model_output_emb.forward(output_words)
-    return output_emb
-
-
 def split_dataset(data, training, dev, test):
+    if training + dev + test != 100:
+        raise Exception('Train, dev, and test must add up to 100%')
+        
     required_verses = training + dev + test
     train_list = []
     dev_list = []
@@ -187,28 +135,29 @@ def split_dataset(data, training, dev, test):
         for chapter in data[book]:
             counter = 0
             max_verses = len(data[book][chapter])
-            if required_verses > max_verses:
-                raise ValueError("not enough verses", required_verses, "in chapter", book, chapter)
-            samples = random.sample(range(1, max_verses + 1), required_verses)
-            for i in range(counter, counter + training):
+            train_verses = int(training / 100. * max_verses)
+            dev_verses = int(dev / 100. * max_verses)
+            test_verse = max_verses - train_verses - dev_verses
+            
+            samples = random.sample(range(0, max_verses), max_verses)
+            for i in range(counter, counter + train_verse):
                 train_list.append((book, chapter, samples[i]))
             counter += training
-            for i in range(counter, counter + dev):
+            for i in range(counter, counter + dev_verses):
                 dev_list.append((book, chapter, samples[i]))
             counter += dev
-            for i in range(counter, counter + test):
+            for i in range(counter, counter + test_verses):
                 test_list.append((book, chapter, samples[i]))
             counter += test
     return train_list, dev_list, test_list
 
 
-def train_model_encdec(train_data, test_data, input_indexer, output_indexer, args):
+def train_model_encdec(data, input_indexer, output_indexer, args):
     # Grab x verses from a dataset as training, x as dev, and x as test
-    kjv = read_kjv("t_kjv.csv")
-    num_train = 6
-    num_dev = 2
-    num_test = 2
-    train_list, dev_list, test_list = split_dataset(kjv, num_train, num_dev, num_test)
+    num_train = 80
+    num_dev = 10
+    num_test = 10
+    train_list, dev_list, test_list = split_dataset(data['src_text'], num_train, num_dev, num_test)
 
     print(args)
     # Sort in descending order by x_indexed, essential for pack_padded_sequence
@@ -335,8 +284,7 @@ if __name__ == '__main__':
 # TODO rewrite loading data methods
     train, dev, test = load_datasets(args.train_path, args.dev_path, args.test_path, domain=args.domain)
     train_data_indexed, dev_data_indexed, test_data_indexed, input_indexer, output_indexer = index_datasets(train, dev,
-                                                                                                            test,
-                                                                                                            args.decoder_len_limit)
+                                                                                                            test, args.decoder_len_limit)
     print("%i train exs, %i dev exs, %i input types, %i output types" % (
     len(train_data_indexed), len(dev_data_indexed), len(input_indexer), len(output_indexer)))
     print("Input indexer: %s" % input_indexer)

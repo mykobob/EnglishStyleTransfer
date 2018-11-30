@@ -188,6 +188,62 @@ def score_indexed_features(feats, weights):
         score += weights[feat]
     return score
 
+###################################
+##          From main.py         ##
+###################################
+
+# Takes the given Examples and their input indexer and turns them into a numpy array by padding them out to max_len.
+# Optionally reverses them.
+def make_padded_input_tensor(exs, input_indexer, max_len, reverse_input):
+    if reverse_input:
+        return np.array(
+            [[ex.x_indexed[len(ex.x_indexed) - 1 - i] if i < len(ex.x_indexed) else input_indexer.index_of(PAD_SYMBOL)
+              for i in range(0, max_len)]
+             for ex in exs])
+    else:
+        return np.array([[ex.x_indexed[i] if i < len(ex.x_indexed) else input_indexer.index_of(PAD_SYMBOL)
+                          for i in range(0, max_len)]
+                         for ex in exs])
+
+
+# Analogous to make_padded_input_tensor, but without the option to reverse input
+def make_padded_output_tensor(exs, output_indexer, max_len):
+    return np.array(
+        [[ex.y_indexed[i] if i < len(ex.y_indexed) else output_indexer.index_of(PAD_SYMBOL) for i in range(0, max_len)]
+         for ex in exs])
+
+
+# Runs the encoder (input embedding layer and encoder as two separate modules) on a tensor of inputs x_tensor with
+# inp_lens_tensor lengths.
+# x_tensor: batch size x sent len tensor of input token indices
+# inp_lens: batch size length vector containing the length of each sentence in the batch
+# model_input_emb: EmbeddingLayer
+# model_enc: RNNEncoder
+# Returns the encoder outputs (per word), the encoder context mask (matrix of 1s and 0s reflecting
+
+# E.g., calling this with x_tensor (0 is pad token):
+# [[12, 25, 0, 0],
+#  [1, 2, 3, 0],
+#  [2, 0, 0, 0]]
+# inp_lens = [2, 3, 1]
+# will return outputs with the following shape:
+# enc_output_each_word = 3 x 4 x dim, enc_context_mask = [[1, 1, 0, 0], [1, 1, 1, 0], [1, 0, 0, 0]],
+# enc_final_states = 3 x dim
+def encode_input_for_decoder(x_tensor, inp_lens_tensor, model_input_emb, model_enc):
+    input_emb = model_input_emb.forward(x_tensor)
+    (enc_output_each_word, enc_context_mask, enc_final_states) = model_enc.forward(input_emb, inp_lens_tensor)
+    enc_final_states_reshaped = (enc_final_states[0].unsqueeze(0), enc_final_states[1].unsqueeze(0))
+    return (enc_output_each_word, enc_context_mask, enc_final_states_reshaped)
+
+
+def prep_word_for_decoder(output_words, model_output_emb):
+    output_emb = model_output_emb.forward(output_words)
+    return output_emb
+
+###################################
+##       Stop from main.py       ##
+###################################
+
 
 ##################
 # Tests

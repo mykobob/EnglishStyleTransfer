@@ -132,18 +132,12 @@ class RNNDecoder(nn.Module):
         return torch.from_numpy(np.asarray([[1 if j < lens.data[i].item() else 0 for j in range(0, max_length)] for i in range(0, lens.shape[0])]))
 
     def attention_function(self, dec_output, src_hidden):
-        #print('dec_output', dec_output.size())
-        #print('src_hidden', src_hidden.size())
         return self.attention_mat(dec_output, src_hidden)
 
     def calculate_weights(self, dec_output, src_sentence_hidden):
         num_src_words = src_sentence_hidden.size()[0]
         dup_dec_output = torch.cat([dec_output] * num_src_words)
-        #weights = torch.zeros((1, num_src_words)).float().to(device)
         weights = self.attention_function(dup_dec_output, src_sentence_hidden)
-        #for i in range(num_src_words):
-        #    src_hidden = src_sentence_hidden[i, :].unsqueeze(0)
-        #    weights[0, i] = self.attention_function(dec_output, src_hidden) # single value
         return torch.t(weights)
 
     def word_embed_weights(self, dec_output, src_sentence_hidden):
@@ -162,9 +156,7 @@ class RNNDecoder(nn.Module):
         src_sentence_embed = src_sentence_embed.squeeze(1)
         attention = self.get_attention(output, src_sentence_embed)
         hidden_layer_input = torch.cat((attention, output), dim=1)
-        # hidden_layer_input = output
 
         vocab_output = self.hidden2vocab(hidden_layer_input)
         vocab_prob = F.log_softmax(vocab_output, dim=1).squeeze(0)
-        #print('vocab_prob', vocab_prob.size())
         return vocab_prob
