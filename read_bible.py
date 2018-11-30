@@ -5,6 +5,8 @@ from collections import defaultdict
 import json
 import re
 
+import data
+
 def all_books():
     books_list = ["Genesis", "Exodus", "Leviticus", "Numbers", "Deuteronomy",
                  "Joshua", "Judges", "Ruth", "1 Samuel", "2 Samuel", "1 Kings",
@@ -22,7 +24,8 @@ def all_books():
     return books_list
 
 def tokenize(verse_text):
-    return re.findall(r"[\w']+|[\"-.,!?:;()]", verse_text)
+    text = re.findall(r"[\w']+|[\"-.,!?:;()]", verse_text)
+    return [SOV_SYMBOL, *text, EOV_SYMBOL]
 
 def read_kjv(file_name):
     """
@@ -73,9 +76,9 @@ def read_esv(src_text):
             verse_id = int(verse_info['verse_id'])
 
             tokenized = tokenize(verse_text)
-            longest = max(longest, len(tokenized))
+#             longest = max(longest, len(tokenized))
             info[book_name][chap_num][verse_id] = tokenized
-    print(f'longest esv is {longest}')
+#     print(f'longest esv is {longest}')
     return info
 
 if __name__ == '__main__':
