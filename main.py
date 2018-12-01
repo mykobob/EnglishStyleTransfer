@@ -3,11 +3,13 @@ import random
 import numpy as np
 import time
 import torch
+import nltk
 from torch import optim
 from models import *
 from data import *
 from read_kjv import *
 from utils import *
+from nltk.translate.bleu_score import sentence_bleu
 
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
@@ -254,6 +256,37 @@ def train_model_encdec(data, input_indexer, output_indexer, args):
 
 # TODO Rewrite this to do BLEU score or compare against correct translation
 def evaluate(test_data, decoder, example_freq=50, print_output=True, outfile=None):
+    pred_derivations = decoder.decode(test_data)
+    # list of the same size as test data
+    # Derivation object
+    
+    num_exact_match = 0
+    num_tokens_correct = 0
+    all_bleu_score = 0.
+    
+    for i, ex in enumerate(test_data):
+        if i % example_freq == 0:
+            print('Example %d' % i)
+            print('  x      = "%s"' % ex.x)
+            print('  y_tok  = "%s"' % ex.y_tok)
+          
+        y_pred = ' '.join(pred_derivations[i].y_toks)
+        # Check exact match
+        if y_pred == ' '.join(ex.y_tok):
+            num_exact_match += 1
+           
+        # Check position-by-position token correctness
+        num_tokens_correct += sum(a == b for a, b in zip(pred_derivations[i].y_toks, ex.y_tok))
+        
+        total_tokens += len(ex.y_tok)
+
+        bleu_score = sentence_bleu(ex.y_tok, pred_derivations[i].y_toks)
+        all_bleu_score += bleu_score
+
+    print("Exact logical form matches: %s" % (render_ratio(num_exact_match, len(test_data))))
+    print("Token-level accuracy: %s" % (render_ratio(num_tokens_correct, total_tokens)))
+    print("Bleu score is: %.2f" % (all_bleu_score))
+
     # Writes to the output file if needed
     if outfile is not None:
         with open(outfile, "w") as out:
