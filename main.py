@@ -308,6 +308,16 @@ if __name__ == '__main__':
 
 # TODO rewrite loading data methods
     kjv, esv = load_bibles(args.kjv, args.esv)
+    train_refs, dev_refs, test_refs = split_dataset(kjv, 80, 10, 10)
+    with open("kjv_train.csv") as f:
+        for ref in train_refs:
+            f.write("%s,%s,%s" % ref[0], ref[1], ref[2])
+    with open("kjv_dev.csv") as f:
+        for ref in dev_refs:
+            f.write("%s,%s,%s" % ref[0], ref[1], ref[2])
+    with open("kjv_test.csv") as f:
+        for ref in test_refs:
+            f.write("%s,%s,%s" % ref[0], ref[1], ref[2])
     train, dev, test = load_datasets(args.train_path, args.dev_path, args.test_path)
     
     train_data_indexed, dev_data_indexed, test_data_indexed, input_indexer, output_indexer = index_datasets(kjv, esv, train, dev,
