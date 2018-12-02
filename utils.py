@@ -240,6 +240,32 @@ def prep_word_for_decoder(output_words, model_output_emb):
     output_emb = model_output_emb.forward(output_words)
     return output_emb
 
+
+def missing_verses_dict():
+    missing = {}
+    missing[("Matthew", 17, 21)] = 1
+    missing[("Matthew", 18, 11)] = 1
+    missing[("Matthew", 23, 4)] = 1
+    missing[("Mark", 7, 16)] = 1
+    missing[("Mark", 9, 44)] = 1
+    missing[("Mark", 9, 46)] = 1
+    missing[("Mark", 11, 26)] = 1
+    missing[("Mark", 15, 28)] = 1
+    missing[("Luke", 17, 36)] = 1
+    missing[("John", 5, 3)] = 1
+    missing[("John", 5, 4)] = 1
+    missing[("Acts", 8, 37)] = 1
+    missing[("Acts", 15, 34)] = 1
+    missing[("Acts", 24, 6)] = 1
+    missing[("Acts", 24, 7)] = 1
+    missing[("Acts", 24, 8)] = 1
+    missing[("Acts", 28, 29)] = 1
+    missing[("Romans", 16, 24)] = 1
+    missing[("1 John", 5, 7)] = 1
+    missing[("1 John", 5, 8)] = 1
+    missing[("Luke", 23, 17)] = 1
+    return missing
+
 ###################################
 ##       Stop from main.py       ##
 ###################################

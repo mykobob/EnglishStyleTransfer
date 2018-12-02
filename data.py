@@ -91,7 +91,7 @@ def index_datasets(src_text, dest_text, train, dev, test, example_len_limit, unk
     # Count words and build the indexers
     for book_name, chapter_num, verse_num in train:
         for token in src_text[book_name][chapter_num][verse_num]:
-            input_word_counts.increment_count(word, 1.0)
+            input_word_counts.increment_count(token, 1.0)
             
     input_indexer = Indexer()
     output_indexer = Indexer()
