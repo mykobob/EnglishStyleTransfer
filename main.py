@@ -226,6 +226,9 @@ def train_model_encdec(train_data, dev_data, input_indexer, output_indexer, args
                 if i == 0:
                     embedded_word = torch.tensor((output_indexer.index_of(SOV_SYMBOL))).to(device)
                     embedded_word = prep_word_for_decoder(embedded_word, model_output_emb).unsqueeze(0).unsqueeze(0)
+                    print('enc_final-states reshaped', enc_final_states_reshaped.shape)
+                    print('embedded_word', embedded_word.shape)
+                    print('enc_output_each_word', enc_output_each_word.shape)
                     token_out = model_dec(enc_final_states_reshaped, embedded_word, enc_output_each_word)
                 else:
                     embedded_word = decoder_embeds[:, i - 1, :].unsqueeze(0)
@@ -318,8 +321,8 @@ if __name__ == '__main__':
                                                                                                             test, args.decoder_len_limit)
     print("%i train exs, %i dev exs, %i input types, %i output types" % (
     len(train_data_indexed), len(dev_data_indexed), len(input_indexer), len(output_indexer)))
-    print("Input indexer: %s" % input_indexer)
-    print("Output indexer: %s" % output_indexer)
+    # print("Input indexer: %s" % input_indexer)
+    # print("Output indexer: %s" % output_indexer)
     print("Here are some examples post tokenization and indexing:")
     for i in range(0, min(len(train_data_indexed), 10)):
         print(train_data_indexed[i])
