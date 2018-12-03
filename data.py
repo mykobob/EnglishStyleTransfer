@@ -65,6 +65,9 @@ def load_dataset(file_path, bible):
     with open(file_path, 'r') as f:
         reader = csv.reader(f)
         verses = list(reader)
+    for i in len(verses):
+        verses[i][1] = int(verses[i][1])
+        verses[i][2] = int(verses[i][2])
     return verses
 
 # Whitespace tokenization
