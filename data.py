@@ -76,7 +76,7 @@ def index(x_tok, indexer):
     return [indexer.index_of(xi) if indexer.index_of(xi) >= 0 else indexer.index_of(UNK_SYMBOL) for xi in x_tok]
 
 
-def index_data(src_text, dest_text, input_indexer, output_indexer, example_len_limit):
+def index_data(data, src_text, dest_text, input_indexer, output_indexer, example_len_limit):
     data_indexed = []
     for book_name, chapter_num, verse_num in data:
         x_tok = src_text[book_name][chapter_num][verse_num]
@@ -118,7 +118,7 @@ def index_datasets(src_text, dest_text, train, dev, test, example_len_limit, unk
         for token in dest_text[book_name][chapter_num][verse_num]:
             output_indexer.get_index(token)
     # Index things
-    train_data_indexed = index_data(train, input_indexer, output_indexer, example_len_limit)
-    dev_data_indexed = index_data(dev, input_indexer, output_indexer, example_len_limit)
-    test_data_indexed = index_data(test, input_indexer, output_indexer, example_len_limit)
+    train_data_indexed = index_data(train, src_text, dest_text, input_indexer, output_indexer, example_len_limit)
+    dev_data_indexed = index_data(dev, src_text, dest_text, input_indexer, output_indexer, example_len_limit)
+    test_data_indexed = index_data(test, src_text, dest_text, input_indexer, output_indexer, example_len_limit)
     return train_data_indexed, dev_data_indexed, test_data_indexed, input_indexer, output_indexer
