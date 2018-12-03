@@ -47,17 +47,25 @@ SOV_SYMBOL = "<SOV>"
 EOV_SYMBOL = "<EOV>"
 
 
-# Reads the training, dev, and test data from the corresponding files.
 def load_bibles(kjv_path, esv_path):
     all_kjv = read_kjv(kjv_path)
     all_esv = read_esv(esv_path)
     return all_kjv, all_esv
 
-def load_datasets(train_path, dev_path, test_path):
-    train_verses = load_dataset(train_path)
-    dev_verses = load_dataset(dev_path)
-    test_verses = load_dataset(test_path)
+# Reads the training, dev, and test data from the corresponding files.
+def load_datasets(train_path, dev_path, test_path, bible):
+    train_verses = load_dataset(train_path, bible)
+    dev_verses = load_dataset(dev_path, bible)
+    test_verses = load_dataset(test_path, bible)
     return train_verses, dev_verses, test_verses
+
+# takes a bible and path to file with references and returns a list of tokenized verses
+def load_dataset(file_path, bible):
+    import csv
+    with open(file_path, 'r') as f:
+        reader = csv.reader(f)
+        verses = list(reader)
+    return verses
 
 # Whitespace tokenization
 def tokenize(x):
@@ -108,9 +116,9 @@ def index_datasets(src_text, dest_text, train, dev, test, example_len_limit, unk
     # Index all output tokens in train
     for book_name, chapter_num, verse_num in train:
         for token in dest_text[book_name][chapter_num][verse_num]:
-            output_indexer.get_index(y_tok)
+            output_indexer.get_index(token)
     # Index things
-    train_data_indexed = index_data(train_data, input_indexer, output_indexer, example_len_limit)
-    dev_data_indexed = index_data(dev_data, input_indexer, output_indexer, example_len_limit)
-    test_data_indexed = index_data(test_data, input_indexer, output_indexer, example_len_limit)
+    train_data_indexed = index_data(train, input_indexer, output_indexer, example_len_limit)
+    dev_data_indexed = index_data(dev, input_indexer, output_indexer, example_len_limit)
+    test_data_indexed = index_data(test, input_indexer, output_indexer, example_len_limit)
     return train_data_indexed, dev_data_indexed, test_data_indexed, input_indexer, output_indexer

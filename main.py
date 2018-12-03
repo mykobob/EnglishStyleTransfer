@@ -7,7 +7,7 @@ import nltk
 from torch import optim
 from models import *
 from data import *
-from read_kjv import *
+from read_bible import *
 from utils import *
 from nltk.translate.bleu_score import sentence_bleu
 
@@ -56,10 +56,10 @@ class Seq2SeqSemanticParser(object):
         self.output_indexer = output_indexer
 
     def start_token(self, output):
-        return self.output_indexer.index_of(SOS_SYMBOL) if output else self.input_indexer.index_of(SOS_SYMBOL)
+        return self.output_indexer.index_of(SOV_SYMBOL) if output else self.input_indexer.index_of(SOV_SYMBOL)
 
     def end_token_idx(self, output):
-        return self.output_indexer.index_of(EOS_SYMBOL) if output else self.input_indexer.index_of('?')
+        return self.output_indexer.index_of(EOV_SYMBOL) if output else self.input_indexer.index_of('?')
 
     def not_end_of_sentence(self, token_idx, output):
         return token_idx.item() != self.end_token_idx(output)
@@ -127,6 +127,7 @@ class Seq2SeqSemanticParser(object):
 def split_dataset(data, training, dev, test):
     if training + dev + test != 100:
         raise Exception('Train, dev, and test must add up to 100%')
+    missing = missing_verses_dict()
     train_list = []
     dev_list = []
     test_list = []
@@ -141,28 +142,31 @@ def split_dataset(data, training, dev, test):
             
             samples = random.sample(range(0, max_verses), max_verses)
             for i in range(counter, counter + train_verses):
-                train_list.append((book, chapter, samples[i]))
+                if (book, chapter, i) not in missing:
+                    train_list.append((book, chapter, samples[i]))
             counter += training
             for i in range(counter, counter + dev_verses):
-                dev_list.append((book, chapter, samples[i]))
+                if (book, chapter, i) not in missing:
+                    dev_list.append((book, chapter, samples[i]))
             counter += dev
             for i in range(counter, counter + test_verses):
-                test_list.append((book, chapter, samples[i]))
+                if (book, chapter, i) not in missing:
+                    test_list.append((book, chapter, samples[i]))
             counter += test
     return train_list, dev_list, test_list
 
 
-def train_model_encdec(data, input_indexer, output_indexer, args):
+def train_model_encdec(train_data, dev_data, input_indexer, output_indexer, args):
     print(args)
     # Sort in descending order by x_indexed, essential for pack_padded_sequence
     train_data.sort(key=lambda ex: len(ex.x_indexed), reverse=True)
-    test_data.sort(key=lambda ex: len(ex.x_indexed), reverse=True)
+    dev_data.sort(key=lambda ex: len(ex.x_indexed), reverse=True)
 
     # Create indexed input
     input_lens = np.asarray([len(ex.x_indexed) for ex in train_data])
     input_max_len = np.max(input_lens)
     all_train_input_data = make_padded_input_tensor(train_data, input_indexer, input_max_len, args.reverse_input)
-    all_test_input_data = make_padded_input_tensor(test_data, input_indexer, input_max_len, args.reverse_input)
+    all_test_input_data = make_padded_input_tensor(dev_data, input_indexer, input_max_len, args.reverse_input)
 
     input_lens_device = torch.from_numpy(input_lens).to(device)
     all_train_input_data_device = torch.from_numpy(all_train_input_data).to(device)
@@ -171,7 +175,7 @@ def train_model_encdec(data, input_indexer, output_indexer, args):
     output_lens = np.asarray([len(ex.y_indexed) for ex in train_data])
     output_max_len = np.max(output_lens)
     all_train_output_data = make_padded_output_tensor(train_data, output_indexer, output_max_len)
-    all_test_output_data = make_padded_output_tensor(test_data, output_indexer, output_max_len)
+    all_test_output_data = make_padded_output_tensor(dev_data, output_indexer, output_max_len)
 
     output_lens_device = torch.from_numpy(output_lens).to(device)
     all_train_output_data_device = torch.from_numpy(all_train_output_data).to(device)
@@ -221,7 +225,7 @@ def train_model_encdec(data, input_indexer, output_indexer, args):
 
             for i in range(output_len):
                 if i == 0:
-                    embedded_word = torch.tensor((output_indexer.index_of(SOS_SYMBOL))).to(device)
+                    embedded_word = torch.tensor((output_indexer.index_of(SOV_SYMBOL))).to(device)
                     embedded_word = prep_word_for_decoder(embedded_word, model_output_emb).unsqueeze(0).unsqueeze(0)
                     token_out = model_dec(enc_final_states_reshaped, embedded_word, enc_output_each_word)
                 else:
@@ -249,7 +253,7 @@ def train_model_encdec(data, input_indexer, output_indexer, args):
         print(f'Total correct: {total_correct}/{total_tokens}')
         parser = Seq2SeqSemanticParser(model_enc, model_input_emb, model_output_emb, model_dec, input_indexer,
                                        output_indexer)
-        evaluate(test_data, parser)
+        evaluate(dev_data, parser)
         print()
     return parser
 
@@ -263,6 +267,7 @@ def evaluate(test_data, decoder, example_freq=50, print_output=True, outfile=Non
     num_exact_match = 0
     num_tokens_correct = 0
     all_bleu_score = 0.
+    total_tokens = 0
     
     for i, ex in enumerate(test_data):
         if i % example_freq == 0:
@@ -288,11 +293,11 @@ def evaluate(test_data, decoder, example_freq=50, print_output=True, outfile=Non
     print("Bleu score is: %.2f" % (all_bleu_score))
 
     # Writes to the output file if needed
-    if outfile is not None:
-        with open(outfile, "w") as out:
-            for i, ex in enumerate(test_data):
-                out.write(ex.x + "\t" + " ".join(selected_derivs[i].y_toks) + "\n")
-        out.close()
+    # if outfile is not None:
+    #     with open(outfile, "w") as out:
+    #         for i, ex in enumerate(test_data):
+    #             out.write(ex.x + "\t" + " ".join(selected_derivs[i].y_toks) + "\n")
+    #     out.close()
 
 
 def render_ratio(numer, denom):
@@ -307,18 +312,8 @@ if __name__ == '__main__':
     # Load the training and test data
 
 # TODO rewrite loading data methods
-    kjv, esv = load_bibles(args.kjv, args.esv)
-    train_refs, dev_refs, test_refs = split_dataset(kjv, 80, 10, 10)
-    with open("kjv_train.csv") as f:
-        for ref in train_refs:
-            f.write("%s,%s,%s" % ref[0], ref[1], ref[2])
-    with open("kjv_dev.csv") as f:
-        for ref in dev_refs:
-            f.write("%s,%s,%s" % ref[0], ref[1], ref[2])
-    with open("kjv_test.csv") as f:
-        for ref in test_refs:
-            f.write("%s,%s,%s" % ref[0], ref[1], ref[2])
-    train, dev, test = load_datasets(args.train_path, args.dev_path, args.test_path)
+    kjv, esv = load_bibles("data/kjv.csv", "data/esv.csv")
+    train, dev, test = load_datasets(args.train_path, args.dev_path, args.test_path, kjv)
     
     train_data_indexed, dev_data_indexed, test_data_indexed, input_indexer, output_indexer = index_datasets(kjv, esv, train, dev,
                                                                                                             test, args.decoder_len_limit)
