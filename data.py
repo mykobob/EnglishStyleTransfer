@@ -3,6 +3,11 @@ import random
 
 from read_bible import *
 
+PAD_SYMBOL = "<PAD>"
+UNK_SYMBOL = "<UNK>"
+SOV_SYMBOL = "<SOV>"
+EOV_SYMBOL = "<EOV>"
+
 # Wrapper class for an example.
 # x = the natural language as one string
 # x_tok = tokenized NL, a list of strings
@@ -41,12 +46,6 @@ class Derivation(object):
         return self.__str__()
 
 
-PAD_SYMBOL = "<PAD>"
-UNK_SYMBOL = "<UNK>"
-SOV_SYMBOL = "<SOV>"
-EOV_SYMBOL = "<EOV>"
-
-
 def load_bibles(kjv_path, esv_path):
     all_kjv = read_kjv(kjv_path)
     all_esv = read_esv(esv_path)
@@ -65,7 +64,7 @@ def load_dataset(file_path, bible):
     with open(file_path, 'r') as f:
         reader = csv.reader(f)
         verses = list(reader)
-    for i in len(verses):
+    for i in range(0, len(verses)):
         verses[i][1] = int(verses[i][1])
         verses[i][2] = int(verses[i][2])
     return verses
@@ -100,10 +99,12 @@ def index_data(data, src_text, dest_text, input_indexer, output_indexer, example
 def index_datasets(src_text, dest_text, train, dev, test, example_len_limit, unk_threshold=0.0):
     input_word_counts = Counter()
     # Count words and build the indexers
-    for book_name, chapter_num, verse_num in train:
-        for token in src_text[book_name][chapter_num][verse_num]:
-            input_word_counts.increment_count(token, 1.0)
-            
+    try:
+        for book_name, chapter_num, verse_num in train:
+            for token in src_text[book_name][chapter_num][verse_num]:
+                input_word_counts.increment_count(token, 1.0)
+    except:
+        print(book_name, chapter_num, verse_num)
     input_indexer = Indexer()
     output_indexer = Indexer()
     # Reserve 0 for the pad symbol for convenience
@@ -117,9 +118,12 @@ def index_datasets(src_text, dest_text, train, dev, test, example_len_limit, unk
         if input_word_counts.get_count(word) > unk_threshold + 0.5:
             input_indexer.get_index(word)
     # Index all output tokens in train
-    for book_name, chapter_num, verse_num in train:
-        for token in dest_text[book_name][chapter_num][verse_num]:
-            output_indexer.get_index(token)
+    try:
+        for book_name, chapter_num, verse_num in train:
+            for token in dest_text[book_name][chapter_num][verse_num]:
+                output_indexer.get_index(token)
+    except:
+        print(book_name, chapter_num, verse_num)
     # Index things
     train_data_indexed = index_data(train, src_text, dest_text, input_indexer, output_indexer, example_len_limit)
     dev_data_indexed = index_data(dev, src_text, dest_text, input_indexer, output_indexer, example_len_limit)

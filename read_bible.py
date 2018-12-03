@@ -5,7 +5,12 @@ from collections import defaultdict
 import json
 import re
 
-import data
+from data import *
+
+PAD_SYMBOL = "<PAD>"
+UNK_SYMBOL = "<UNK>"
+SOV_SYMBOL = "<SOV>"
+EOV_SYMBOL = "<EOV>"
 
 def all_books():
     books_list = ["Genesis", "Exodus", "Leviticus", "Numbers", "Deuteronomy",
@@ -37,7 +42,6 @@ def read_kjv(file_name):
     kjv = {}
     for book in books:
         kjv[book] = defaultdict(defaultdict)
-    print()
 
     # non_alphanumeric = {}
     # longest = 0

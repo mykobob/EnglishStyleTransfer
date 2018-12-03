@@ -39,7 +39,7 @@ class RNNEncoder(nn.Module):
         self.hidden_size = hidden_size
         self.reduce_h_W = nn.Linear(hidden_size * 2, hidden_size, bias=True)
         self.reduce_c_W = nn.Linear(hidden_size * 2, hidden_size, bias=True)
-        self.rnn = nn.LSTM(input_size, hidden_size, num_layers=1, batch_first=True,
+        self.rnn = nn.GRU(input_size, hidden_size, num_layers=1, batch_first=True,
                                dropout=dropout, bidirectional=self.bidirect)
         self.init_weight()
 

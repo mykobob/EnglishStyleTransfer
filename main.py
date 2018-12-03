@@ -18,16 +18,15 @@ def _parse_args():
 
     # General system running and configuration options
 
-    parser.add_argument('--train_path', type=str, default='data/geo_train.tsv', help='path to train data')
-    parser.add_argument('--dev_path', type=str, default='data/geo_dev.tsv', help='path to dev data')
-    parser.add_argument('--test_path', type=str, default='data/geo_test.tsv', help='path to blind test data')
-    parser.add_argument('--test_output_path', type=str, default='geo_test_output.tsv',
+    parser.add_argument('--train_path', type=str, default='data/kjv_train.csv', help='path to train data')
+    parser.add_argument('--dev_path', type=str, default='data/kjv_dev.csv', help='path to dev data')
+    parser.add_argument('--test_path', type=str, default='data/kjv_test.csv', help='path to blind test data')
+    parser.add_argument('--test_output_path', type=str, default='bible_output.tsv',
                         help='path to write blind test results')
-    parser.add_argument('--domain', type=str, default='geo', help='domain (geo for geoquery)')
 
     # Some common arguments for your convenience
     parser.add_argument('--seed', type=int, default=0, help='RNG seed (default = 0)')
-    parser.add_argument('--epochs', type=int, default=100, help='num epochs to train for')
+    parser.add_argument('--epochs', type=int, default=10, help='num epochs to train for')
     parser.add_argument('--lr', type=float, default=.001)
     parser.add_argument('--batch_size', type=int, default=2, help='batch size')
     # 65 is all you need for GeoQuery
@@ -140,19 +139,19 @@ def split_dataset(data, training, dev, test):
             dev_verses = int(dev / 100. * max_verses)
             test_verses = max_verses - train_verses - dev_verses
             
-            samples = random.sample(range(0, max_verses), max_verses)
+            samples = random.sample(range(1, max_verses + 1), max_verses)
             for i in range(counter, counter + train_verses):
-                if (book, chapter, i) not in missing:
+                if (book, chapter, samples[i]) not in missing:
                     train_list.append((book, chapter, samples[i]))
-            counter += training
+            counter += train_verses
             for i in range(counter, counter + dev_verses):
-                if (book, chapter, i) not in missing:
+                if (book, chapter, samples[i]) not in missing:
                     dev_list.append((book, chapter, samples[i]))
-            counter += dev
+            counter += dev_verses
             for i in range(counter, counter + test_verses):
-                if (book, chapter, i) not in missing:
+                if (book, chapter, samples[i]) not in missing:
                     test_list.append((book, chapter, samples[i]))
-            counter += test
+            counter += test_verses
     return train_list, dev_list, test_list
 
 
@@ -312,7 +311,7 @@ if __name__ == '__main__':
     # Load the training and test data
 
 # TODO rewrite loading data methods
-    kjv, esv = load_bibles("data/kjv.csv", "data/esv.csv")
+    kjv, esv = load_bibles("data/kjv.csv", "data/esv.txt")
     train, dev, test = load_datasets(args.train_path, args.dev_path, args.test_path, kjv)
     
     train_data_indexed, dev_data_indexed, test_data_indexed, input_indexer, output_indexer = index_datasets(kjv, esv, train, dev,

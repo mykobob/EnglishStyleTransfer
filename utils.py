@@ -1,5 +1,11 @@
 # utils.py
+import numpy as np
+from data import *
 
+PAD_SYMBOL = "<PAD>"
+UNK_SYMBOL = "<UNK>"
+SOV_SYMBOL = "<SOV>"
+EOV_SYMBOL = "<EOV>"
 
 # Bijection between objects and integers starting at 0. Useful for mapping
 # labels, features, etc. into coordinates of a vector space.
@@ -243,9 +249,10 @@ def prep_word_for_decoder(output_words, model_output_emb):
 
 def missing_verses_dict():
     missing = {}
+    missing[("Matthew", 12, 47)] = 1
     missing[("Matthew", 17, 21)] = 1
     missing[("Matthew", 18, 11)] = 1
-    missing[("Matthew", 23, 4)] = 1
+    missing[("Matthew", 23, 14)] = 1
     missing[("Mark", 7, 16)] = 1
     missing[("Mark", 9, 44)] = 1
     missing[("Mark", 9, 46)] = 1
