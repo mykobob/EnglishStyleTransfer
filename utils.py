@@ -236,11 +236,13 @@ def make_padded_output_tensor(exs, output_indexer, max_len):
 # enc_output_each_word = 3 x 4 x dim, enc_context_mask = [[1, 1, 0, 0], [1, 1, 1, 0], [1, 0, 0, 0]],
 # enc_final_states = 3 x dim
 def encode_input_for_decoder(x_tensor, inp_lens_tensor, model_input_emb, model_enc):
-    print('x_tensor', x_tensor.shape)
+    # print('x_tensor', x_tensor.shape)
     input_emb = model_input_emb.forward(x_tensor)
-    print('input_emb', input_emb.shape)
+    # print('input_emb', input_emb.shape)
     (enc_output_each_word, enc_context_mask, enc_final_states) = model_enc.forward(input_emb, inp_lens_tensor)
-    print('enc_final_states', enc_final_states[0].shape)
+    # print('enc_output_each_word', enc_output_each_word.shape)
+    # print('enc_context_mask', enc_output_each_word.shape)
+    # print('enc_final_states', enc_final_states[0].shape)
     enc_final_states_reshaped = enc_final_states[0].unsqueeze(0).unsqueeze(0)  #, enc_final_states[1].unsqueeze(0))
     # print('enc_final_states[0]', enc_final_states[0].shape, enc_final_states_reshaped.shape)
     return (enc_output_each_word, enc_context_mask, enc_final_states_reshaped)

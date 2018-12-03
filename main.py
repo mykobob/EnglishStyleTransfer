@@ -226,9 +226,9 @@ def train_model_encdec(train_data, dev_data, input_indexer, output_indexer, args
                 if i == 0:
                     embedded_word = torch.tensor((output_indexer.index_of(SOV_SYMBOL))).to(device)
                     embedded_word = prep_word_for_decoder(embedded_word, model_output_emb).unsqueeze(0).unsqueeze(0)
-                    print('enc_final-states reshaped', enc_final_states_reshaped.shape)
-                    print('embedded_word', embedded_word.shape)
-                    print('enc_output_each_word', enc_output_each_word.shape)
+                    # print('enc_final-states reshaped', enc_final_states_reshaped.shape)
+                    # print('embedded_word', embedded_word.shape)
+                    # print('enc_output_each_word', enc_output_each_word.shape)
                     token_out = model_dec(enc_final_states_reshaped, embedded_word, enc_output_each_word)
                 else:
                     embedded_word = decoder_embeds[:, i - 1, :].unsqueeze(0)
@@ -242,6 +242,8 @@ def train_model_encdec(train_data, dev_data, input_indexer, output_indexer, args
             total_loss += loss_value.item()
 
             predictions = torch.argmax(output_probs, dim=1)
+            # print('predictions length', output_len.item())
+            # print([output_indexer.get_object(pred.item()) for pred in predictions[:output_len]])
             cur_correct = torch.sum(predictions == expected_output[:output_len])
             total_correct += cur_correct
             total_tokens += output_len
@@ -323,9 +325,9 @@ if __name__ == '__main__':
     len(train_data_indexed), len(dev_data_indexed), len(input_indexer), len(output_indexer)))
     # print("Input indexer: %s" % input_indexer)
     # print("Output indexer: %s" % output_indexer)
-    print("Here are some examples post tokenization and indexing:")
-    for i in range(0, min(len(train_data_indexed), 10)):
-        print(train_data_indexed[i])
+    # print("Here are some examples post tokenization and indexing:")
+    # for i in range(0, min(len(train_data_indexed), 10)):
+    #     print(train_data_indexed[i])
     decoder = train_model_encdec(train_data_indexed, dev_data_indexed, input_indexer, output_indexer, args)
     print("=======FINAL EVALUATION=======")
     # evaluate(test_data_indexed, decoder, outfile="geo_test_output.tsv")

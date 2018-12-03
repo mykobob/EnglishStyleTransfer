@@ -15,6 +15,7 @@ class EmbeddingLayer(nn.Module):
     # Parameters: dimension of the word embeddings, number of words, and the dropout rate to apply
     # (0.2 is often a reasonable value)
     def __init__(self, input_dim, full_dict_size, embedding_dropout_rate):
+        # print('input_dim', input_dim, 'full_dict_size', full_dict_size, 'embed_dropout', embedding_dropout_rate)
         super(EmbeddingLayer, self).__init__()
         self.dropout = nn.Dropout(embedding_dropout_rate)
         self.word_embedding = nn.Embedding(full_dict_size, input_dim)
@@ -102,7 +103,7 @@ class RNNDecoder(nn.Module):
         self.hidden_size = hidden_size
         self.encoder_hidden_size = encoder_hidden_size
         self.attention_hidden_size = encoder_hidden_size + hidden_size
-        self.rnn = nn.LSTM(input_size, hidden_size, num_layers=1, batch_first=True,
+        self.rnn = nn.GRU(input_size, hidden_size, num_layers=1, batch_first=True,
                            dropout=dropout)
         self.hidden2vocab = nn.Linear(self.attention_hidden_size, output_size, bias=True)
         # self.hidden2vocab = nn.Linear(self.hidden_size, output_size, bias=True)
