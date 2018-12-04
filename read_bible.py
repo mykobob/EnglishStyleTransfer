@@ -12,6 +12,8 @@ UNK_SYMBOL = "<UNK>"
 SOV_SYMBOL = "<SOV>"
 EOV_SYMBOL = "<EOV>"
 
+gospels = ['Matthew', 'Mark', 'Luke', 'John']
+
 def all_books():
     books_list = ["Genesis", "Exodus", "Leviticus", "Numbers", "Deuteronomy",
                  "Joshua", "Judges", "Ruth", "1 Samuel", "2 Samuel", "1 Kings",
@@ -53,7 +55,8 @@ def read_kjv(file_name):
             this_verse = int(line[3])
             verse_text = line[4]
             tokenized = tokenize(verse_text)
-            kjv[this_book][this_chapter][this_verse] = tokenized
+            if this_book in gospels:
+                kjv[this_book][this_chapter][this_verse] = tokenized
 #             longest = max(longest, max([len(verse) for verse in kjv[this_book][this_chapter]]))
 #             this_verse = len(kjv[this_book][this_chapter])
             # This inserts an index at chapter -1, so be careful using it to debug
@@ -81,7 +84,8 @@ def read_esv(src_text):
 
             tokenized = tokenize(verse_text)
 #             longest = max(longest, len(tokenized))
-            info[book_name][chap_num][verse_id] = tokenized
+            if book_name in gospels:
+                info[book_name][chap_num][verse_id] = tokenized
 #     print(f'longest esv is {longest}')
     return info
 

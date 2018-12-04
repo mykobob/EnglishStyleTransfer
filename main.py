@@ -39,6 +39,9 @@ def _parse_args():
     parser.add_argument('--emb_dropout', type=float, default=0.2)
     parser.add_argument('--rnn_dropout', type=float, default=0.2)
     parser.add_argument('--bidirectional', type=bool, default=False)
+    
+    parser.add_argument('--esv', type=str)
+    parser.add_argument('--kjv', type=str)
 
     args = parser.parse_args()
     return args
@@ -119,7 +122,7 @@ class Seq2SeqSemanticParser(object):
                     test_tokens_idx.append(prediction_idx.item())
                 test_tokens_idx = test_tokens_idx[:-1]
                 test_tokens = [self.get_token(output, token_idx) for token_idx in test_tokens_idx]
-                # ans.append([Derivation(test_ex, prediction_score, test_tokens)])
+                ans.append([Derivation(test_ex, prediction_score, test_tokens)])
 
         return ans
 
@@ -198,6 +201,8 @@ def train_model_encdec(train_data, dev_data, input_indexer, output_indexer, args
         list(model_enc.parameters()) + list(model_dec.parameters()) + list(model_input_emb.parameters()) + list(
             model_output_emb.parameters()), lr=args.lr)
 
+    start_token = torch.tensor((output_indexer.index_of(SOV_SYMBOL))).to(device)
+
     for epoch in range(epochs):
         model_input_emb.train()
         model_enc.train()
@@ -224,17 +229,13 @@ def train_model_encdec(train_data, dev_data, input_indexer, output_indexer, args
 
             for i in range(output_len):
                 if i == 0:
-                    embedded_word = torch.tensor((output_indexer.index_of(SOV_SYMBOL))).to(device)
+                    embedded_word = start_token
                     embedded_word = prep_word_for_decoder(embedded_word, model_output_emb).unsqueeze(0).unsqueeze(0)
-                    # print('enc_final-states reshaped', enc_final_states_reshaped.shape)
-                    # print('embedded_word', embedded_word.shape)
-                    # print('enc_output_each_word', enc_output_each_word.shape)
                     token_out = model_dec(enc_final_states_reshaped, embedded_word, enc_output_each_word)
                 else:
                     embedded_word = decoder_embeds[:, i - 1, :].unsqueeze(0)
                     token_out = model_dec(model_dec.hidden, embedded_word, enc_output_each_word)
 
-                # print('token_out', token_out)
                 output_probs[i, :] = token_out
 
             loss = torch.nn.NLLLoss()
@@ -242,8 +243,6 @@ def train_model_encdec(train_data, dev_data, input_indexer, output_indexer, args
             total_loss += loss_value.item()
 
             predictions = torch.argmax(output_probs, dim=1)
-            # print('predictions length', output_len.item())
-            # print([output_indexer.get_object(pred.item()) for pred in predictions[:output_len]])
             cur_correct = torch.sum(predictions == expected_output[:output_len])
             total_correct += cur_correct
             total_tokens += output_len
@@ -251,14 +250,14 @@ def train_model_encdec(train_data, dev_data, input_indexer, output_indexer, args
             loss_value.backward()
             optimizer.step()
 
-            if example % 100 == 0:
+            if example % 1000 == 0:
                 print('example {}/{} is done'.format(example, all_train_input_data.shape[0]))
         print(f'Epoch {epoch+1} done. Loss: {total_loss:.2f}. It took {time.time() - start} seconds')
         print(f'Total correct: {total_correct}/{total_tokens}')
         parser = Seq2SeqSemanticParser(model_enc, model_input_emb, model_output_emb, model_dec, input_indexer,
                                        output_indexer)
-        evaluate(dev_data, parser)
-        print()
+        # evaluate(dev_data, parser)
+        # print()
     return parser
 
 
@@ -278,18 +277,20 @@ def evaluate(test_data, decoder, example_freq=50, print_output=True, outfile=Non
             print('Example %d' % i)
             print('  x      = "%s"' % ex.x)
             print('  y_tok  = "%s"' % ex.y_tok)
-          
-        y_pred = ' '.join(pred_derivations[i].y_toks)
+            print('  y_pred = "%s"' % pred_derivations[i][0])
+
+        best_pred = pred_derivations[i][0]
+        y_pred = ' '.join(best_pred.y_toks)
         # Check exact match
         if y_pred == ' '.join(ex.y_tok):
             num_exact_match += 1
            
         # Check position-by-position token correctness
-        num_tokens_correct += sum(a == b for a, b in zip(pred_derivations[i].y_toks, ex.y_tok))
+        num_tokens_correct += sum(a == b for a, b in zip(pred_derivations[i][0].y_toks, ex.y_tok))
         
         total_tokens += len(ex.y_tok)
 
-        bleu_score = sentence_bleu(ex.y_tok, pred_derivations[i].y_toks)
+        bleu_score = sentence_bleu(ex.y_tok, pred_derivations[i][0].y_toks)
         all_bleu_score += bleu_score
 
     print("Exact logical form matches: %s" % (render_ratio(num_exact_match, len(test_data))))
@@ -314,11 +315,14 @@ if __name__ == '__main__':
     random.seed(args.seed)
     np.random.seed(args.seed)
     # Load the training and test data
-
-# TODO rewrite loading data methods
-    kjv, esv = load_bibles("data/kjv.csv", "data/esv.txt")
-    train, dev, test = load_datasets(args.train_path, args.dev_path, args.test_path, kjv)
     
+    kjv, esv = load_bibles(args.kjv, args.esv)
+    train, dev, test = load_datasets(args.train_path, args.dev_path, args.test_path, kjv)
+#     limit = 5000
+#     train = train[:limit]
+#     dev = dev[:limit]
+#     test = dev[:limit]
+
     train_data_indexed, dev_data_indexed, test_data_indexed, input_indexer, output_indexer = index_datasets(kjv, esv, train, dev,
                                                                                                             test, args.decoder_len_limit)
     print("%i train exs, %i dev exs, %i input types, %i output types" % (
