@@ -38,7 +38,7 @@ def _parse_args():
     parser.add_argument('--reverse_input', type=bool, default=False)
     parser.add_argument('--emb_dropout', type=float, default=0.2)
     parser.add_argument('--rnn_dropout', type=float, default=0.2)
-    parser.add_argument('--bidirectional', type=bool, default=False)
+    parser.add_argument('--bidirectional', type=bool, default=True)
     
     parser.add_argument('--esv', type=str)
     parser.add_argument('--kjv', type=str)
