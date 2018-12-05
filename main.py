@@ -9,7 +9,8 @@ from models import *
 from data import *
 from read_bible import *
 from utils import *
-from nltk.translate.bleu_score import sentence_bleu
+
+from nltk.translate.bleu_score import sentence_bleu, SmoothingFunction
 
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
@@ -290,12 +291,12 @@ def evaluate(test_data, decoder, example_freq=50, print_output=True, outfile=Non
         
         total_tokens += len(gt)
 
-        bleu_score = sentence_bleu([gt], pred_derivations[i][0].y_toks)
+        bleu_score = sentence_bleu([gt], pred_derivations[i][0].y_toks, weights=(0.25, 0.25, 0.25, 0.25))
         all_bleu_score += bleu_score
 
     print("Exact logical form matches: %s" % (render_ratio(num_exact_match, len(test_data))))
     print("Token-level accuracy: %s" % (render_ratio(num_tokens_correct, total_tokens)))
-    print("Bleu score is: %.2f" % (all_bleu_score))
+    print("Bleu score is: %.5f" % (all_bleu_score / len(test_data)))
 
     # Writes to the output file if needed
     # if outfile is not None:
