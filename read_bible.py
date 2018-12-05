@@ -16,13 +16,16 @@ gospels = ['Matthew', 'Mark', 'Luke', 'John']
 epistles = ["Romans", "1 Corinthians", "2 Corinthians", "Galatians", "Ephesians",
             "Philippians", "Colossians", "1 Thessalonians", "2 Thessalonians",
             "1 Timothy", "2 Timothy", "Titus", "Philemon"]
+luke_to_acts = ["Luke", "John", "Acts"]
 
 def in_category(book_name):
-    category = 'epistles'
+    category = 'luke_to_acts'
     if category == 'gospels':
         return book_name in gospels
     elif category == 'epistles':
         return book_name in epistles
+    elif category == 'luke_to_acts':
+        return book_name in luke_to_acts
     else:
         return True
 
