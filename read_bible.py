@@ -16,7 +16,7 @@ gospels = ['Matthew', 'Mark', 'Luke', 'John']
 epistles = ["Romans", "1 Corinthians", "2 Corinthians", "Galatians", "Ephesians",
             "Philippians", "Colossians", "1 Thessalonians", "2 Thessalonians",
             "1 Timothy", "2 Timothy", "Titus", "Philemon"]
-luke_to_acts = ["Luke", "John", "Acts"]
+luke_to_acts = ["Luke", "Acts"]
 
 def in_category(book_name):
     category = 'luke_to_acts'
