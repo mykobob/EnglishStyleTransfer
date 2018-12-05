@@ -57,17 +57,17 @@ class Seq2SeqSemanticParser(object):
         self.input_indexer = input_indexer
         self.output_indexer = output_indexer
 
-    def start_token(self, output):
-        return self.output_indexer.index_of(SOV_SYMBOL) if output else self.input_indexer.index_of(SOV_SYMBOL)
+    def start_token(self):
+        return self.output_indexer.index_of(SOV_SYMBOL)
 
-    def end_token_idx(self, output):
-        return self.output_indexer.index_of(EOV_SYMBOL) if output else self.input_indexer.index_of('?')
+    def end_token_idx(self):
+        return self.output_indexer.index_of(EOV_SYMBOL)
 
-    def not_end_of_sentence(self, token_idx, output):
-        return token_idx.item() != self.end_token_idx(output)
+    def not_end_of_sentence(self, token_idx):
+        return token_idx.item() != self.end_token_idx()
 
-    def get_token(self, output, token_idx):
-        return self.output_indexer.get_object(token_idx) if output else self.input_indexer.get_object(token_idx)
+    def get_token(self, token_idx):
+        return self.output_indexer.get_object(token_idx)
 
     def toggle_decoding(self):
         self.encoder.eval()
@@ -90,13 +90,12 @@ class Seq2SeqSemanticParser(object):
                     = encode_input_for_decoder(word_indexes, input_len, self.model_input_embed, self.encoder)
 
                 # Decode here
-                output = True
-                input_token = torch.tensor((self.start_token(output))).to(device)
+                input_token = torch.tensor((self.start_token())).to(device)
                 test_tokens_idx = []
                 prediction_score = 0.
                 output_idx = 0
 
-                while self.not_end_of_sentence(input_token, output):
+                while self.not_end_of_sentence(input_token):
                     input_embed = prep_word_for_decoder(input_token, self.model_output_embed).unsqueeze(0).unsqueeze(0)
 
                     if output_idx == 0:
@@ -121,7 +120,7 @@ class Seq2SeqSemanticParser(object):
 
                     test_tokens_idx.append(prediction_idx.item())
                 test_tokens_idx = test_tokens_idx[:-1]
-                test_tokens = [self.get_token(output, token_idx) for token_idx in test_tokens_idx]
+                test_tokens = [self.get_token(token_idx) for token_idx in test_tokens_idx]
                 ans.append([Derivation(test_ex, prediction_score, test_tokens)])
 
         return ans
@@ -159,7 +158,6 @@ def split_dataset(data, training, dev, test):
 
 
 def train_model_encdec(train_data, dev_data, input_indexer, output_indexer, args):
-    print(args)
     # Sort in descending order by x_indexed, essential for pack_padded_sequence
     train_data.sort(key=lambda ex: len(ex.x_indexed), reverse=True)
     dev_data.sort(key=lambda ex: len(ex.x_indexed), reverse=True)
@@ -256,7 +254,8 @@ def train_model_encdec(train_data, dev_data, input_indexer, output_indexer, args
         print(f'Total correct: {total_correct}/{total_tokens}')
         parser = Seq2SeqSemanticParser(model_enc, model_input_emb, model_output_emb, model_dec, input_indexer,
                                        output_indexer)
-        # evaluate(dev_data, parser)
+        if epoch % 4 == 0:
+            evaluate(dev_data, parser)
         # print()
     return parser
 
@@ -273,24 +272,25 @@ def evaluate(test_data, decoder, example_freq=50, print_output=True, outfile=Non
     total_tokens = 0
     
     for i, ex in enumerate(test_data):
+        gt = ex.y_tok[:-1]
         if i % example_freq == 0:
             print('Example %d' % i)
             print('  x      = "%s"' % ex.x)
-            print('  y_tok  = "%s"' % ex.y_tok)
+            print('  y_tok  = "%s"' % gt)
             print('  y_pred = "%s"' % pred_derivations[i][0])
 
         best_pred = pred_derivations[i][0]
         y_pred = ' '.join(best_pred.y_toks)
         # Check exact match
-        if y_pred == ' '.join(ex.y_tok):
+        if y_pred == ' '.join(gt):
             num_exact_match += 1
            
         # Check position-by-position token correctness
-        num_tokens_correct += sum(a == b for a, b in zip(pred_derivations[i][0].y_toks, ex.y_tok))
+        num_tokens_correct += sum(a == b for a, b in zip(pred_derivations[i][0].y_toks, gt))
         
-        total_tokens += len(ex.y_tok)
+        total_tokens += len(gt)
 
-        bleu_score = sentence_bleu(ex.y_tok, pred_derivations[i][0].y_toks)
+        bleu_score = sentence_bleu([gt], pred_derivations[i][0].y_toks)
         all_bleu_score += bleu_score
 
     print("Exact logical form matches: %s" % (render_ratio(num_exact_match, len(test_data))))

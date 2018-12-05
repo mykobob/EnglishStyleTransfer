@@ -83,9 +83,10 @@ class RNNEncoder(nn.Module):
         # Note: if you want multiple LSTM layers, you'll need to change this to consult the penultimate layer
         # or gather representations from all layers.
         if self.bidirect:
-            h = hn[0]
+            forward, backward = hn[0], hn[1]
+#             print(hn[0].shape, hn[1].shape, hn.shape, type(hn))
             # Grab the representations from forward and backward LSTMs
-            h_ = torch.cat((h[0], h[1]), dim=1)
+            h_ = torch.cat((forward, backward), dim=1)
             # Reduce them by multiplying by a weight matrix so that the hidden size sent to the decoder is the same
             # as the hidden size in the encoder
             new_h = self.reduce_h_W(h_)

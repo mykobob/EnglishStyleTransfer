@@ -13,6 +13,18 @@ SOV_SYMBOL = "<SOV>"
 EOV_SYMBOL = "<EOV>"
 
 gospels = ['Matthew', 'Mark', 'Luke', 'John']
+epistles = ["Romans", "1 Corinthians", "2 Corinthians", "Galatians", "Ephesians",
+            "Philippians", "Colossians", "1 Thessalonians", "2 Thessalonians",
+            "1 Timothy", "2 Timothy", "Titus", "Philemon"]
+
+def in_category(book_name):
+    category = 'epistles'
+    if category == 'gospels':
+        return book_name in gospels
+    elif category == 'epistles':
+        return book_name in epistles
+    else:
+        return True
 
 def all_books():
     books_list = ["Genesis", "Exodus", "Leviticus", "Numbers", "Deuteronomy",
@@ -55,7 +67,7 @@ def read_kjv(file_name):
             this_verse = int(line[3])
             verse_text = line[4]
             tokenized = tokenize(verse_text)
-            if this_book in gospels:
+            if in_category(this_book):
                 kjv[this_book][this_chapter][this_verse] = tokenized
 #             longest = max(longest, max([len(verse) for verse in kjv[this_book][this_chapter]]))
 #             this_verse = len(kjv[this_book][this_chapter])
@@ -84,7 +96,7 @@ def read_esv(src_text):
 
             tokenized = tokenize(verse_text)
 #             longest = max(longest, len(tokenized))
-            if book_name in gospels:
+            if in_category(book_name):
                 info[book_name][chap_num][verse_id] = tokenized
 #     print(f'longest esv is {longest}')
     return info
