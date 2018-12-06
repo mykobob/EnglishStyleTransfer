@@ -84,6 +84,7 @@ class Seq2SeqSemanticParser(object):
         with torch.no_grad():
             ans = []
             for test_ex in test_data:
+                count_punc = 0
                 # Encoder part
                 word_indexes = torch.tensor(test_ex.x_indexed).unsqueeze(0).to(device)
                 input_len = torch.tensor(len(test_ex.x_indexed)).unsqueeze(0).to(device)
@@ -110,10 +111,15 @@ class Seq2SeqSemanticParser(object):
                         prediction_score += output_probs[gt_word_idx].item()
                         # HOW TO CALCULATE THIS??
                     else:
-                        if output_idx > len(test_ex.y_indexed) + 3:
+                        if output_idx > 105:
                             break
 
                     prediction_idx = torch.argmax(output_probs)
+                    while prediction_idx == self.output_indexer.index_of(EOV_SYMBOL) and count_punc < 3:
+                        prediction_idx = torch.argmax(torch.cat((output_probs[:prediction_idx],
+                                                                 output_probs[prediction_idx+1:]), 0))
+                    if self.get_token(prediction_idx) in [",", ".", ":", ";"]:
+                        count_punc += 1
 
                     # Feed in predicted value into next lstm cell
                     output_idx += 1
