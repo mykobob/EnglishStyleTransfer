@@ -116,8 +116,8 @@ class Seq2SeqSemanticParser(object):
 
                     prediction_idx = torch.argmax(output_probs)
                     while prediction_idx == self.output_indexer.index_of(EOV_SYMBOL) and count_punc < 3:
-                        prediction_idx = torch.argmax(torch.cat((output_probs[:prediction_idx],
-                                                                 output_probs[prediction_idx+1:]), 0))
+                        output_probs[prediction_idx] = -np.inf
+                        prediction_idx = torch.argmax(output_probs)
                     if self.get_token(prediction_idx) in [",", ".", ":", ";"]:
                         count_punc += 1
 

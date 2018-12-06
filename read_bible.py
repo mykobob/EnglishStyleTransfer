@@ -19,7 +19,7 @@ epistles = ["Romans", "1 Corinthians", "2 Corinthians", "Galatians", "Ephesians"
 luke_to_acts = ["Luke", "Acts"]
 
 def in_category(book_name):
-    category = 'all'
+    category = 'luke_to_acts'
     if category == 'gospels':
         return book_name in gospels
     elif category == 'epistles':
