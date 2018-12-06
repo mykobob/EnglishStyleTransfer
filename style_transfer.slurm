@@ -14,15 +14,15 @@
 #----------------------------------------------------
 
 #SBATCH -J style_transfer           # Job name
-#SBATCH -o myjob.o%j       # Name of stdout output file
-#SBATCH -e myjob.e%j       # Name of stderr error file
+#SBATCH -o results/gospels_0004_2.o%j       # Name of stdout output file
+#SBATCH -e results/gospels_0004_2.e%j       # Name of stderr error file
 #SBATCH -p gtx             # Queue (partition) name
 #SBATCH -N 1               # Total # of nodes (must be 1 for serial)
 #SBATCH -n 1               # Total # of mpi tasks (should be 1 for serial)
-#SBATCH -t 01:00:00        # Run time (hh:mm:ss)
-#SBATCH --mail-user=myname@utexas.edu
+#SBATCH -t 08:00:00        # Run time (hh:mm:ss)
+#SBATCH --mail-user=
 #SBATCH --mail-type=all    # Send email at begin and end of job
-#SBATCH -A myproject       # Allocation name (req'd if you have more than 1)
+#SBATCH -A 	   # Allocation name (req'd if you have more than 1)
 
 # Other commands must follow all #SBATCH directives...
 
@@ -32,6 +32,6 @@ date
 
 # Launch serial code (add options here)
 
-python main.py         # Do not use ibrun or any other MPI launcher
+python main.py --hidden_size 512 --epochs 25 --esv data/esv.txt --kjv data/kjv.csv --lr 0.0004 --train_path data/gospels/kjv_train.csv --dev_path data/gospels/kjv_dev.csv --test_path data/gospels/kjv_test.csv
 
 # ---------------------------------------------------
