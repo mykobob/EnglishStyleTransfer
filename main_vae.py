@@ -36,6 +36,8 @@ def _parse_args():
     parser.add_argument('--output_dim', type=int, default=100, help='output vector dimensionality')
     parser.add_argument('--hidden_size', type=int, default=200, help='hidden state dimensionality')
 
+    parser.add_argument('--vae_bottleneck_size', type=int, default=256, help='Size of bottle neck layer')
+
     parser.add_argument('--reverse_input', type=bool, default=False)
     parser.add_argument('--emb_dropout', type=float, default=0.2)
     parser.add_argument('--rnn_dropout', type=float, default=0.2)
@@ -163,8 +165,14 @@ def split_dataset(data, training, dev, test):
             counter += test_verses
     return train_list, dev_list, test_list
 
+def loss_function(recon_x, x, mu, logvar):
+    BCE = F.binary_cross_entropy(recon_x, x, reduction='sum')
 
-def train_model_encdec(train_data, dev_data, input_indexer, output_indexer, args):
+    KLD = -0.5 * torch.sum(1 + logvar - mu.pow(2) - logvar.exp())
+
+    return BCE + KLD
+
+def train_model_vae(train_data, dev_data, indexer, args):
     # Sort in descending order by x_indexed, essential for pack_padded_sequence
     train_data.sort(key=lambda ex: len(ex.x_indexed), reverse=True)
     dev_data.sort(key=lambda ex: len(ex.x_indexed), reverse=True)
@@ -172,8 +180,8 @@ def train_model_encdec(train_data, dev_data, input_indexer, output_indexer, args
     # Create indexed input
     input_lens = np.asarray([len(ex.x_indexed) for ex in train_data])
     input_max_len = np.max(input_lens)
-    all_train_input_data = make_padded_input_tensor(train_data, input_indexer, input_max_len, args.reverse_input)
-    all_test_input_data = make_padded_input_tensor(dev_data, input_indexer, input_max_len, args.reverse_input)
+    all_train_input_data = make_padded_input_tensor(train_data, indexer, input_max_len, args.reverse_input)
+    all_test_input_data = make_padded_input_tensor(dev_data, indexer, input_max_len, args.reverse_input)
 
     input_lens_device = torch.from_numpy(input_lens).to(device)
     all_train_input_data_device = torch.from_numpy(all_train_input_data).to(device)
@@ -181,8 +189,8 @@ def train_model_encdec(train_data, dev_data, input_indexer, output_indexer, args
 
     output_lens = np.asarray([len(ex.y_indexed) for ex in train_data])
     output_max_len = np.max(output_lens)
-    all_train_output_data = make_padded_output_tensor(train_data, output_indexer, output_max_len)
-    all_test_output_data = make_padded_output_tensor(dev_data, output_indexer, output_max_len)
+    all_train_output_data = make_padded_output_tensor(train_data, indexer, output_max_len)
+    all_test_output_data = make_padded_output_tensor(dev_data, indexer, output_max_len)
 
     output_lens_device = torch.from_numpy(output_lens).to(device)
     all_train_output_data_device = torch.from_numpy(all_train_output_data).to(device)
@@ -193,22 +201,18 @@ def train_model_encdec(train_data, dev_data, input_indexer, output_indexer, args
     print("Train matrix: %s; shape = %s" % (all_train_input_data, all_train_input_data.shape))
 
     # Create model
-    model_emb = EmbeddingLayer(args.input_dim, len(input_indexer), args.emb_dropout).to(device)
-    vae = VAE(args.input_dim, args.hidden_size, args.vae_bottleneck_size, args.hidden_size, len(input_indexer), args.rnn_dropout, args.bidirectional).to(device)
+    vae = VAE(args.input_dim, len(indexer), args.input_dim, args.hidden_size, args.vae_bottleneck_size, args.hidden_size, args.rnn_dropout, args.bidirectional, args.emb_dropout).to(device)
     #model_output_emb = EmbeddingLayer(args.output_dim, len(output_indexer), args.emb_dropout).to(device)
 
     # Loop over epochs, loop over examples, given some indexed words, call encode_input_for_decoder, then call your
     # decoder, accumulate losses, update parameters
     epochs = args.epochs
-    optimizer = optim.Adam(list(vae.parameters()) + list(model_output_emb.parameters()), lr=args.lr)
+    optimizer = optim.Adam(list(vae.parameters()), lr=args.lr)
 
-    start_token = torch.tensor((output_indexer.index_of(SOV_SYMBOL))).to(device)
+    start_token = torch.tensor((indexer.index_of(SOV_SYMBOL))).to(device)
 
     for epoch in range(epochs):
-        model_input_emb.train()
-        model_enc.train()
-        model_output_emb.train()
-        model_dec.train()
+        vae.train()
         total_loss = 0
         total_correct = 0
         total_tokens = 0
@@ -219,48 +223,29 @@ def train_model_encdec(train_data, dev_data, input_indexer, output_indexer, args
             # Encoder part
             word_indexes = all_train_input_data_device[example].unsqueeze(0)
             input_len = input_lens_device[example].unsqueeze(0)
-            enc_output_each_word, enc_context_mask, enc_final_states_reshaped = \
-                encode_input_for_decoder(word_indexes, input_len, model_input_emb, model_enc)
 
             # Decoder part
             expected_output = all_train_output_data_device[example]
-            decoder_embeds = prep_word_for_decoder(expected_output.unsqueeze(0), model_output_emb)
             output_len = output_lens_device[example]
-            output_probs = torch.zeros((output_len, len(output_indexer))).to(device)
+            output_probs = torch.zeros((output_len, len(indexer))).to(device)
 
-            for i in range(output_len):
-                if i == 0:
-                    embedded_word = start_token
-                    embedded_word = prep_word_for_decoder(embedded_word, model_output_emb).unsqueeze(0).unsqueeze(0)
-                    token_out = model_dec(enc_final_states_reshaped, embedded_word, enc_output_each_word)
-                else:
-                    embedded_word = decoder_embeds[:, i - 1, :].unsqueeze(0)
-                    token_out = model_dec(model_dec.hidden, embedded_word, enc_output_each_word)
+            recon_batch, mu, logvar = vae(word_indexes, input_len, indexer)
+            loss = loss_function(recon_batch, word_indexes, mu, logvar)
+            loss.backward()
 
-                output_probs[i, :] = token_out
-
-            loss = torch.nn.NLLLoss()
-            loss_value = loss(output_probs, expected_output[:output_len])
-            total_loss += loss_value.item()
-
-            predictions = torch.argmax(output_probs, dim=1)
-            cur_correct = torch.sum(predictions == expected_output[:output_len])
-            total_correct += cur_correct
-            total_tokens += output_len
-
-            loss_value.backward()
+            total_loss += loss.item()
             optimizer.step()
 
             if example % 1000 == 0:
                 print('example {}/{} is done'.format(example, all_train_input_data.shape[0]))
         print(f'Epoch {epoch+1} done. Loss: {total_loss:.2f}. It took {time.time() - start} seconds')
         print(f'Total correct: {total_correct}/{total_tokens}')
-        parser = Seq2SeqSemanticParser(model_enc, model_input_emb, model_output_emb, model_dec, input_indexer,
-                                       output_indexer)
-        if epoch % 4 == 0:
-            evaluate(dev_data, parser)
+        # parser = Seq2SeqSemanticParser(model_enc, model_input_emb, model_output_emb, model_dec, input_indexer,
+        #                                output_indexer)
+        # if epoch % 4 == 0:
+        #     evaluate(dev_data, parser)
         # print()
-    return parser
+    return None
 
 
 # TODO Rewrite this to do BLEU score or compare against correct translation
@@ -328,14 +313,14 @@ if __name__ == '__main__':
 
     train_data_indexed, dev_data_indexed, test_data_indexed, input_indexer, output_indexer = index_datasets(kjv, esv, train, dev,
                                                                                                             test, args.decoder_len_limit)
-    print("%i train exs, %i dev exs, %i input types, %i output types" % (
-    len(train_data_indexed), len(dev_data_indexed), len(input_indexer), len(output_indexer)))
+    print("%i train exs, %i dev exs, %i types" % (
+    len(train_data_indexed), len(dev_data_indexed), len(output_indexer)))
     # print("Input indexer: %s" % input_indexer)
     # print("Output indexer: %s" % output_indexer)
     # print("Here are some examples post tokenization and indexing:")
     # for i in range(0, min(len(train_data_indexed), 10)):
     #     print(train_data_indexed[i])
-    decoder = train_model_encdec(train_data_indexed, dev_data_indexed, input_indexer, output_indexer, args)
+    decoder = train_model_vae(train_data_indexed, dev_data_indexed, output_indexer, args)
     print("=======FINAL EVALUATION=======")
     # evaluate(test_data_indexed, decoder, outfile="geo_test_output.tsv")
     eval_time = time.time()

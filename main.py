@@ -10,7 +10,7 @@ from data import *
 from read_bible import *
 from utils import *
 
-from nltk.translate.bleu_score import sentence_bleu, SmoothingFunction
+from nltk.translate.bleu_score import corpus_bleu, SmoothingFunction
 
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
@@ -84,6 +84,7 @@ class Seq2SeqSemanticParser(object):
         with torch.no_grad():
             ans = []
             for test_ex in test_data:
+                required_punc = sum([1 if ch in [",", ".", ":", ";"] else 0 for ch in test_ex.x_tok])
                 count_punc = 0
                 # Encoder part
                 word_indexes = torch.tensor(test_ex.x_indexed).unsqueeze(0).to(device)
@@ -115,9 +116,10 @@ class Seq2SeqSemanticParser(object):
                             break
 
                     prediction_idx = torch.argmax(output_probs)
-                    while prediction_idx == self.output_indexer.index_of(EOV_SYMBOL) and count_punc < 3:
-                        output_probs[prediction_idx] = -np.inf
-                        prediction_idx = torch.argmax(output_probs)
+                    if count_punc < required_punc:
+                        while prediction_idx == self.output_indexer.index_of(EOV_SYMBOL):
+                            output_probs[prediction_idx] = -np.inf
+                            prediction_idx = torch.argmax(output_probs)
                     if self.get_token(prediction_idx) in [",", ".", ":", ";"]:
                         count_punc += 1
 
@@ -278,6 +280,9 @@ def evaluate(test_data, decoder, example_freq=50, print_output=True, outfile=Non
     all_bleu_score = 0.
     total_tokens = 0
     
+    references = [ex.y_tok[:-1] for i, ex in enumerate(test_data)]
+    predictions = [None] * len(references)
+    
     for i, ex in enumerate(test_data):
         gt = ex.y_tok[:-1]
         if i % example_freq == 0:
@@ -293,16 +298,19 @@ def evaluate(test_data, decoder, example_freq=50, print_output=True, outfile=Non
             num_exact_match += 1
            
         # Check position-by-position token correctness
-        num_tokens_correct += sum(a == b for a, b in zip(pred_derivations[i][0].y_toks, gt))
+        num_tokens_correct += sum(a == b for a, b in zip(best_pred.y_toks, gt))
         
         total_tokens += len(gt)
-
-        bleu_score = sentence_bleu([gt], pred_derivations[i][0].y_toks, weights=(0.25, 0.25, 0.25, 0.25))
-        all_bleu_score += bleu_score
+        predictions[i] = best_pred.y_toks
+        
+        
+#     bleu_score = sentence_bleu([gt], pred_derivations[i][0].y_toks, weights=(0.25, 0.25, 0.25, 0.25))
+#     all_bleu_score += bleu_score
+    bleu_score = corpus_bleu(references, predictions)
 
     print("Exact logical form matches: %s" % (render_ratio(num_exact_match, len(test_data))))
     print("Token-level accuracy: %s" % (render_ratio(num_tokens_correct, total_tokens)))
-    print("Bleu score is: %.5f" % (all_bleu_score / len(test_data)))
+    print("Bleu score is: %.5f" % (bleu_score))
 
     # Writes to the output file if needed
     # if outfile is not None:

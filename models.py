@@ -6,6 +6,8 @@ from torch.autograd import Variable as Var
 
 import numpy as np
 
+from data import SOV_SYMBOL
+
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 #device = torch.device("cuda:0" if False and torch.cuda.is_available() else "cpu")
 
@@ -168,14 +170,17 @@ class RNNDecoder(nn.Module):
 
 class VAE(nn.Module):
     
-    def __init__(self, input_size, encoder_hidden_size, bottleneck_size, decoder_hidden_size, output_size, dropout, bidirect):
+    def __init__(self, embed_size, vocab_size, input_size, encoder_hidden_size, bottleneck_size, decoder_hidden_size, dropout, bidirect, emb_dropout):
         super(VAE, self).__init__()
+        self.embed_size = embed_size
+        self.model_emb = EmbeddingLayer(embed_size, vocab_size, emb_dropout)
         self.input_size = input_size
         self.bottleneck_size = bottleneck_size
         self.encoder = RNNEncoder(input_size, encoder_hidden_size, dropout, bidirect)
-        self.bottleneck_mu = self.Linear(encoder_hidden_size, bottleneck_size)
-        self.bottleneck_sigma = self.Linear(encoder_hidden_size, bottleneck_size)
-        self.decoder = RNNDecoder(bottleneck_size, encoder_hidden_size, decoder_hidden_size, output_size, dropout, attention=False)
+        bidirect_mult = 2 if bidirect else 1
+        self.bottleneck_mu = nn.Linear(bidirect_mult * encoder_hidden_size, bottleneck_size)
+        self.bottleneck_sigma = nn.Linear(bidirect_mult * encoder_hidden_size, bottleneck_size)
+        self.decoder = RNNDecoder(bottleneck_size, encoder_hidden_size, decoder_hidden_size, vocab_size, dropout, attention=False)
     
     def init_weight(self):
         self.encoder.init_weight()
@@ -183,17 +188,33 @@ class VAE(nn.Module):
         nn.init.xavier_uniform_(self.bottleneck_sigma)
         self.decoder.init_weight()
 
-    def encode(self, embedded_words, input_lens):
+    def encode(self, word_idxes, input_lens):
+        embedded_words = self.model_emb(word_idxes)
         output, mask, hidden = self.encoder(embedded_words, input_lens)
         return self.bottleneck_mu(output), self.bottleneck_sigma(output)
+
+    def decode(self, latent_space, num_words, indexer):
+        words = []
+        next_word = indexer.index_of(SOV_SYMBOL)
+        for i in range(num_words):
+            words.append(next_word)
+            embedded_word = self.model_emb(torch.tensor((next_word)).unsqueeze(0).to(device))
+            print('latent space', latent_space.shape)
+            print('embedded_word', embedded_word.shape)
+            token_out = self.decoder(latent_space, embedded_word.unsqueeze(0), None) # None because no attention
+            next_word = torch.argmax(token_out)
+        words.append(next_word)
+
+        return words
+
 
     def reparameterize(self, mu, logvar):
         std = torch.exp(0.5 * logvar)
         eps = torch.randn_like(std)
         return eps.mul(std).add_(mu)
 
-    def forward(self, x):
-        mu, logvar = self.encode(x)
+    def forward(self, word_idxes, input_lens, indexer):
+        mu, logvar = self.encode(word_idxes, input_lens)
         z = self.reparameterize(mu, logvar)
-        return self.decode(z), mu, logvar
+        return self.decode(z, input_lens, indexer), mu, logvar
 
