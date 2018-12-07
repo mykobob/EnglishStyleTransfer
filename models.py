@@ -98,12 +98,13 @@ class RNNEncoder(nn.Module):
 
 class RNNDecoder(nn.Module):
 
-    def __init__(self, input_size, encoder_hidden_size, hidden_size, output_size, dropout):
+    def __init__(self, input_size, encoder_hidden_size, hidden_size, output_size, dropout, attention=True):
         super(RNNDecoder, self).__init__()
         self.input_size = input_size
         self.hidden_size = hidden_size
         self.encoder_hidden_size = encoder_hidden_size
         self.attention_hidden_size = encoder_hidden_size + hidden_size
+        self.attention = attention
         self.rnn = nn.GRU(input_size, hidden_size, num_layers=1, batch_first=True,
                            dropout=dropout)
         self.hidden2vocab = nn.Linear(self.attention_hidden_size, output_size, bias=True)
@@ -154,10 +155,45 @@ class RNNDecoder(nn.Module):
         output, self.hidden = self.rnn(embedded_word, input_hidden)
         output = output.squeeze(0)
 
-        src_sentence_embed = src_sentence_embed.squeeze(1)
-        attention = self.get_attention(output, src_sentence_embed)
-        hidden_layer_input = torch.cat((attention, output), dim=1)
+        if self.attention:
+            src_sentence_embed = src_sentence_embed.squeeze(1)
+            attention = self.get_attention(output, src_sentence_embed)
+            hidden_layer_input = torch.cat((attention, output), dim=1)
+        else:
+            hidden_layer_input = output
 
         vocab_output = self.hidden2vocab(hidden_layer_input)
         vocab_prob = F.log_softmax(vocab_output, dim=1).squeeze(0)
         return vocab_prob
+
+class VAE(nn.Module):
+    
+    def __init__(self, input_size, encoder_hidden_size, bottleneck_size, decoder_hidden_size, output_size, dropout, bidirect):
+        super(VAE, self).__init__()
+        self.input_size = input_size
+        self.bottleneck_size = bottleneck_size
+        self.encoder = RNNEncoder(input_size, encoder_hidden_size, dropout, bidirect)
+        self.bottleneck_mu = self.Linear(encoder_hidden_size, bottleneck_size)
+        self.bottleneck_sigma = self.Linear(encoder_hidden_size, bottleneck_size)
+        self.decoder = RNNDecoder(bottleneck_size, encoder_hidden_size, decoder_hidden_size, output_size, dropout, attention=False)
+    
+    def init_weight(self):
+        self.encoder.init_weight()
+        nn.init.xavier_uniform_(self.bottleneck_mu)
+        nn.init.xavier_uniform_(self.bottleneck_sigma)
+        self.decoder.init_weight()
+
+    def encode(self, embedded_words, input_lens):
+        output, mask, hidden = self.encoder(embedded_words, input_lens)
+        return self.bottleneck_mu(output), self.bottleneck_sigma(output)
+
+    def reparameterize(self, mu, logvar):
+        std = torch.exp(0.5 * logvar)
+        eps = torch.randn_like(std)
+        return eps.mul(std).add_(mu)
+
+    def forward(self, x):
+        mu, logvar = self.encode(x)
+        z = self.reparameterize(mu, logvar)
+        return self.decode(z), mu, logvar
+
