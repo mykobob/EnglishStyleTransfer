@@ -5,3 +5,9 @@ python generate_datasets.py --kjv_path data/kjv.csv --esv_path data/esv.txt --kj
 Example main run:
 
 python main.py --train_path data/epistles/kjv_train.csv --dev_path data/epistles/kjv_dev.csv --test_path data/epistles/kjv_test.csv --esv data/esv.txt --kjv data/kjv.csv --epochs 10 --lr 0.0004 --hidden_size 512 --category epistles
+
+Example lm run:
+
+python LM.py --cuda --data_type bible --nhid 512 --epochs 20 --batch_size 16 --indexer_file esv_indexer.obj
+
+python test_lm.py --model_path best_model.pt --indexer_path esv_indexer.obj

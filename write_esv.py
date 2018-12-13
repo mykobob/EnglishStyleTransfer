@@ -11,5 +11,5 @@ def write_tokens(source, destination):
 
 
 if __name__ == '__main__':
-    esv = read_esv('data/esv.txt')
+    esv = read_esv('data/esv.txt', category='full')
     write_tokens(esv, 'data/esv_tokens.txt')

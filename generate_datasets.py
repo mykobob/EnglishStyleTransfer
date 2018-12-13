@@ -6,7 +6,7 @@ from main import *
 import argparse
 
 def save(kjv_path, esv_path, kjv_data_path, esv_data_path):
-    kjv, esv = load_bibles(kjv_path, esv_path, 'epistles')
+    kjv, esv = load_bibles(kjv_path, esv_path, 'all')
     train_refs, dev_refs, test_refs = split_dataset(kjv, 80, 10, 10)
     with open('{}_train.csv'.format(kjv_data_path), "w") as f:
         for ref in train_refs:
