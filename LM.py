@@ -8,6 +8,7 @@ import torch.nn as nn
 import torch.onnx
 import numpy as np
 
+from torch import optim
 import pickle
 from read_bible import read_esv
 from data import load_datasets, index_dataset, PAD_SYMBOL, EOV_SYMBOL
@@ -186,6 +187,7 @@ def evaluate(data_source, data_source_lens):
     hidden = model.init_hidden(eval_batch_size)
     with torch.no_grad():
 #         for i in range(0, data_source.size(0) - 1, args.bptt):
+#         import pdb; pdb.set_trace()
         for batch_idx, batch in enumerate(data_source):
 #             data, targets = get_batch(data_source, i)
             data, targets = get_batch_targets(batch, data_source_lens[batch_idx])
@@ -194,7 +196,6 @@ def evaluate(data_source, data_source_lens):
 
             output_flat = output.view(-1, ntokens)
             targets_flat = targets.view(-1)
-#             import pdb; pdb.set_trace()
             total_loss += len(data) * criterion(output_flat, targets_flat).item()
             hidden = repackage_hidden(hidden)
     return total_loss / (len(data_source) - 1)
@@ -207,6 +208,7 @@ def train():
     start_time = time.time()
     ntokens = len(indexer)
     hidden = model.init_hidden(args.batch_size)
+    optimizer = optim.Adam(list(model.parameters()), lr=lr)
     for batch_idx, batch in enumerate(train_data):
         data, targets = get_batch_targets(batch, train_data_lens[batch_idx])
         # Starting each batch, we detach the hidden state from how it was previously produced.
@@ -214,7 +216,6 @@ def train():
         hidden = repackage_hidden(hidden)
         model.zero_grad()
         output, hidden = model(data, train_data_lens[batch_idx], hidden)
-        
         model_flat = output.view(-1, ntokens)
         targets_flat = targets.view(-1)
         loss = criterion(model_flat, targets_flat)
@@ -222,17 +223,18 @@ def train():
 
         # `clip_grad_norm` helps prevent the exploding gradient problem in RNNs / LSTMs.
         torch.nn.utils.clip_grad_norm_(model.parameters(), args.clip)
-        for p in model.parameters():
-            p.data.add_(-lr, p.grad.data)
+        # for p in model.parameters():
+        #     p.data.add_(-lr, p.grad.data)
 
         total_loss += loss.item()
+        optimizer.step()
 
         if batch_idx % args.log_interval == 0 and batch_idx > 0:
             cur_loss = total_loss / args.log_interval
             elapsed = time.time() - start_time
-            print('| epoch {:3d} | {:5d}/{:5d} batches | lr {:02.2f} | ms/batch {:5.2f} | '
+            print('| epoch {:3d} | {:5d}/{:5d} batches | lr {:02.4f} | ms/batch {:5.2f} | '
                     'loss {:5.2f} | ppl {:8.2f}'.format(
-                epoch, batch, len(train_data) // args.bptt, lr,
+                epoch, batch_idx, len(train_data) // args.bptt, lr,
                 elapsed * 1000 / args.log_interval, cur_loss, math.exp(cur_loss)))
             total_loss = 0
             start_time = time.time()
@@ -271,6 +273,7 @@ try:
             with open(args.save, 'wb') as f:
                 torch.save(model, f)
             best_val_loss = val_loss
+            print('Found new best model')
         else:
             # Anneal the learning rate if no improvement has been seen in the validation dataset.
             lr /= 4.0
@@ -296,8 +299,8 @@ print('=' * 89)
 sentence = 'For God so loved the world'.split(' ')
 sentence_idx = torch.tensor([[indexer.index_of(token) for token in sentence]]).to(device)
 sentence_lens = torch.tensor(len(sentence)).unsqueeze(0).to(device)
-hidden = model.hidden
-#hidden = model.init_hidden(1)
+# hidden = model.hidden
+hidden = model.init_hidden(1)
 output, hidden = model(sentence_idx, sentence_lens, hidden)
 for i in range(len(sentence)):
     print('Input:', sentence[i])

@@ -31,8 +31,8 @@ device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 sentence = 'For God so loved the world'.split(' ')
 sentence_idx = torch.tensor([[indexer.index_of(token) for token in sentence]]).to(device)
 sentence_lens = torch.tensor(len(sentence)).unsqueeze(0).to(device)
-hidden = model.hidden
-#hidden = model.init_hidden(1)
+# hidden = model.hidden
+hidden = model.init_hidden(1)
 output, hidden = model(sentence_idx, sentence_lens, hidden)
 for i in range(len(sentence)):
     print('Input:', sentence[i])
@@ -41,4 +41,3 @@ for i in range(len(sentence)):
     else:
         print('Expected: <EOV>. Predicted:', indexer.get_object(torch.argmax(output[0][i]).item()))
     print()
-import pdb; pdb.set_trace()
