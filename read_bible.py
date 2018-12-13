@@ -18,7 +18,7 @@ epistles = ["Romans", "1 Corinthians", "2 Corinthians", "Galatians", "Ephesians"
             "1 Timothy", "2 Timothy", "Titus", "Philemon"]
 luke_to_acts = ["Luke", "Acts"]
 
-def in_category(book_name, category='luke_acts'):
+def in_category(book_name, category=None):
     if category == 'gospels':
         return book_name in gospels
     elif category == 'epistles':
@@ -107,8 +107,8 @@ def read_esv(src_text, category):
     return info
 
 if __name__ == '__main__':
-    kjv = read_kjv("data/kjv.csv")
+    kjv = read_kjv("data/kjv.csv", 'epistles')
     print(kjv["John"][3][16])
     
-    esv = read_esv('data/esv.txt')
+    esv = read_esv('data/esv.txt', 'epistles')
     print(esv["John"][3][16])

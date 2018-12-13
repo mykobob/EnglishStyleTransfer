@@ -79,7 +79,7 @@ class Seq2SeqSemanticParser(object):
         self.decoder.eval()
 
 # TODO rewrite end derivation code
-    def decode(self, test_data):
+    def decode(self, test_data, lm):
         # loop through test_data (maybe in batches)
         self.toggle_decoding()
 
@@ -159,7 +159,7 @@ def split_dataset(data, training, dev, test):
     return train_list, dev_list, test_list
 
 
-def train_model_encdec(train_data, dev_data, input_indexer, output_indexer, args):
+def train_model_encdec(train_data, dev_data, input_indexer, output_indexer, args, lm):
     # Sort in descending order by x_indexed, essential for pack_padded_sequence
     train_data.sort(key=lambda ex: len(ex.x_indexed), reverse=True)
     dev_data.sort(key=lambda ex: len(ex.x_indexed), reverse=True)
@@ -245,6 +245,9 @@ def train_model_encdec(train_data, dev_data, input_indexer, output_indexer, args
 
             loss = torch.nn.NLLLoss()
 #             import pdb; pdb.set_trace()
+            # incorporate language models here
+            print(expected_output)
+            input()
             loss_value = loss(output_probs, expected_output[:output_len])
             total_loss += loss_value.item()
 
@@ -269,7 +272,7 @@ def train_model_encdec(train_data, dev_data, input_indexer, output_indexer, args
 
 
 # TODO Rewrite this to do BLEU score or compare against correct translation
-def evaluate(test_data, decoder, example_freq=50, print_output=True, outfile=None):
+def evaluate(test_data, decoder, example_freq=50, print_output=True, outfile=None, lm=None):
     pred_derivations = decoder.decode(test_data)
     # list of the same size as test data
     # Derivation object
@@ -330,16 +333,16 @@ if __name__ == '__main__':
     random.seed(args.seed)
     np.random.seed(args.seed)
     # Load the training and test data
-    
     kjv, esv = load_bibles(args.kjv, args.esv, args.category)
     train, dev, test = load_datasets(args.train_path, args.dev_path, args.test_path, kjv)
 #     limit = 5000
 #     train = train[:limit]
 #     dev = dev[:limit]
 #     test = dev[:limit]
-
     train_data_indexed, dev_data_indexed, test_data_indexed, input_indexer, output_indexer = index_datasets(kjv, esv, train, dev,
                                                                                                             test, args.decoder_len_limit)
+    # load language model
+    lm = get_kenlm('data/esv_tokens.txt.arpa')
     print("%i train exs, %i dev exs, %i input types, %i output types" % (
     len(train_data_indexed), len(dev_data_indexed), len(input_indexer), len(output_indexer)))
     # print("Input indexer: %s" % input_indexer)
@@ -347,11 +350,11 @@ if __name__ == '__main__':
     # print("Here are some examples post tokenization and indexing:")
     # for i in range(0, min(len(train_data_indexed), 10)):
     #     print(train_data_indexed[i])
-    decoder = train_model_encdec(train_data_indexed, dev_data_indexed, input_indexer, output_indexer, args)
+    decoder = train_model_encdec(train_data_indexed, dev_data_indexed, input_indexer, output_indexer, args, lm)
     print("=======FINAL EVALUATION=======")
     # evaluate(test_data_indexed, decoder, outfile="geo_test_output.tsv")
     eval_time = time.time()
-    evaluate(test_data_indexed, decoder, print_output=True, outfile="geo_test_output.tsv")
+    evaluate(test_data_indexed, decoder, print_output=True, outfile="geo_test_output.tsv", lm=lm)
     print(f'Evaluation took {time.time() - eval_time} seconds')
 
 

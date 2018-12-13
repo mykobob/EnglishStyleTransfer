@@ -1,6 +1,7 @@
 # utils.py
 import numpy as np
 from data import *
+import kenlm
 
 PAD_SYMBOL = "<PAD>"
 UNK_SYMBOL = "<UNK>"
@@ -279,6 +280,10 @@ def missing_verses_dict():
     missing[("1 John", 5, 8)] = 1
     missing[("Luke", 23, 17)] = 1
     return missing
+
+
+def get_kenlm(path):
+    return kenlm.Model(path)
 
 ###################################
 ##       Stop from main.py       ##
