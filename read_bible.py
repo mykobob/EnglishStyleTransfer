@@ -18,13 +18,12 @@ epistles = ["Romans", "1 Corinthians", "2 Corinthians", "Galatians", "Ephesians"
             "1 Timothy", "2 Timothy", "Titus", "Philemon"]
 luke_to_acts = ["Luke", "Acts"]
 
-def in_category(book_name):
-    category = 'luke_to_acts'
+def in_category(book_name, category='luke_acts'):
     if category == 'gospels':
         return book_name in gospels
     elif category == 'epistles':
         return book_name in epistles
-    elif category == 'luke_to_acts':
+    elif category == 'luke_acts':
         return book_name in luke_to_acts
     else:
         return True
@@ -45,11 +44,14 @@ def all_books():
                  "Revelation"]
     return books_list
 
-def tokenize(verse_text):
+def tokenize(verse_text, target_lang):
     text = re.findall(r"[\w']+|[\"-.,!?:;()]", verse_text)
-    return [SOV_SYMBOL, *text, EOV_SYMBOL]
+    if target_lang:
+        return [*text, EOV_SYMBOL]
+    else:
+        return text
 
-def read_kjv(file_name):
+def read_kjv(file_name, category):
     """
     Returns dict of entire King James Version from .csv file
     { chapter_name : { chapter_idx : { verse_idx : list_of_cleaned_tokens } } }
@@ -69,8 +71,8 @@ def read_kjv(file_name):
             this_chapter = int(line[2])
             this_verse = int(line[3])
             verse_text = line[4]
-            tokenized = tokenize(verse_text)
-            if in_category(this_book):
+            tokenized = tokenize(verse_text, False)
+            if in_category(this_book, category):
                 kjv[this_book][this_chapter][this_verse] = tokenized
 #             longest = max(longest, max([len(verse) for verse in kjv[this_book][this_chapter]]))
 #             this_verse = len(kjv[this_book][this_chapter])
@@ -84,7 +86,7 @@ def read_kjv(file_name):
     # print('longest verse is', longest)
     return kjv
 
-def read_esv(src_text):
+def read_esv(src_text, category):
     # Get Book with number of chapters and number of verses
     # dict of book name to array of numbers for # of verses
     longest = 0
@@ -97,9 +99,9 @@ def read_esv(src_text):
             verse_text = verse_info['verse_text']
             verse_id = int(verse_info['verse_id'])
 
-            tokenized = tokenize(verse_text)
+            tokenized = tokenize(verse_text, True)
 #             longest = max(longest, len(tokenized))
-            if in_category(book_name):
+            if in_category(book_name, category):
                 info[book_name][chap_num][verse_id] = tokenized
 #     print(f'longest esv is {longest}')
     return info

@@ -1,6 +1,7 @@
 from utils import *
 import random
 
+import numpy as np
 from read_bible import *
 
 PAD_SYMBOL = "<PAD>"
@@ -46,9 +47,9 @@ class Derivation(object):
         return self.__str__()
 
 
-def load_bibles(kjv_path, esv_path):
-    all_kjv = read_kjv(kjv_path)
-    all_esv = read_esv(esv_path)
+def load_bibles(kjv_path, esv_path, category):
+    all_kjv = read_kjv(kjv_path, category)
+    all_esv = read_esv(esv_path, category)
     return all_kjv, all_esv
 
 # Reads the training, dev, and test data from the corresponding files.
@@ -129,3 +130,53 @@ def index_datasets(src_text, dest_text, train, dev, test, example_len_limit, unk
     dev_data_indexed = index_data(dev, src_text, dest_text, input_indexer, output_indexer, example_len_limit)
     test_data_indexed = index_data(test, src_text, dest_text, input_indexer, output_indexer, example_len_limit)
     return train_data_indexed, dev_data_indexed, test_data_indexed, input_indexer, output_indexer
+
+# Indexes train and test datasets where all words occurring less than or equal to unk_threshold times are
+# replaced by UNK tokens.
+
+# Input is 
+    # KJV/ESV dicts of {book_name -> {chapter_num -> {verse_num: -> [character tokens]}}}
+    # train/dev/test set information
+# Output should be 
+    # a list of Example objects for train/dev/test
+def index_dataset(text, train, dev, test, example_len_limit, unk_threshold=0.0):
+    word_counts = Counter()
+    # Count words and build the indexers
+    try:
+        for book_name, chapter_num, verse_num in train:
+            for token in text[book_name][chapter_num][verse_num]:
+                word_counts.increment_count(token, 1.0)
+    except:
+        print(book_name, chapter_num, verse_num)
+    indexer = Indexer()
+    
+    # Reserve 0 for the pad symbol for convenience
+    indexer.get_index(PAD_SYMBOL)
+    indexer.get_index(UNK_SYMBOL)
+    indexer.get_index(PAD_SYMBOL)
+    indexer.get_index(SOV_SYMBOL)
+    indexer.get_index(EOV_SYMBOL)
+    # Index all input words above the UNK threshold
+    for word in word_counts.keys():
+        if word_counts.get_count(word) > unk_threshold + 0.5:
+            indexer.get_index(word)
+
+    # Index things
+    train_data_indexed = index_single_data(train, text, indexer, example_len_limit)
+    dev_data_indexed = index_single_data(dev, text, indexer, example_len_limit)
+    test_data_indexed = index_single_data(test, text, indexer, example_len_limit)
+    return train_data_indexed, dev_data_indexed, test_data_indexed, indexer
+
+def index_single_data(data, text, indexer, example_len_limit):
+    data_indexed = []
+    max_len = -1
+    min_len = 100000000
+    for book_name, chapter_num, verse_num in data:
+        x_tok = text[book_name][chapter_num][verse_num]
+#         data_indexed.append(Example(' '.join(x_tok), x_tok, index(x_tok, input_indexer), ' '.join(y_tok), y_tok,
+#                                           index(y_tok, output_indexer)))
+        max_len = max(max_len, len(x_tok))
+        min_len = min(min_len, len(x_tok))
+        data_indexed.append(np.array(index(x_tok, indexer)))
+#     print(f'size ranges from {min_len} to {max_len}')
+    return data_indexed

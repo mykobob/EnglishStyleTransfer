@@ -37,9 +37,11 @@ def _parse_args():
     parser.add_argument('--hidden_size', type=int, default=200, help='hidden state dimensionality')
 
     parser.add_argument('--reverse_input', type=bool, default=False)
-    parser.add_argument('--emb_dropout', type=float, default=0.2)
-    parser.add_argument('--rnn_dropout', type=float, default=0.2)
+    parser.add_argument('--emb_dropout', type=float, default=0.3)
+    parser.add_argument('--rnn_dropout', type=float, default=0.5)
     parser.add_argument('--bidirectional', type=bool, default=True)
+    
+    parser.add_argument('--category', default='luke_acts')
     
     parser.add_argument('--esv', type=str)
     parser.add_argument('--kjv', type=str)
@@ -84,8 +86,6 @@ class Seq2SeqSemanticParser(object):
         with torch.no_grad():
             ans = []
             for test_ex in test_data:
-                required_punc = sum([1 if ch in [",", ".", ":", ";"] else 0 for ch in test_ex.x_tok])
-                count_punc = 0
                 # Encoder part
                 word_indexes = torch.tensor(test_ex.x_indexed).unsqueeze(0).to(device)
                 input_len = torch.tensor(len(test_ex.x_indexed)).unsqueeze(0).to(device)
@@ -116,13 +116,6 @@ class Seq2SeqSemanticParser(object):
                             break
 
                     prediction_idx = torch.argmax(output_probs)
-                    if count_punc < required_punc:
-                        while prediction_idx == self.output_indexer.index_of(EOV_SYMBOL):
-                            output_probs[prediction_idx] = -np.inf
-                            prediction_idx = torch.argmax(output_probs)
-                    if self.get_token(prediction_idx) in [",", ".", ":", ";"]:
-                        count_punc += 1
-
                     # Feed in predicted value into next lstm cell
                     output_idx += 1
                     input_token = prediction_idx
@@ -233,7 +226,9 @@ def train_model_encdec(train_data, dev_data, input_indexer, output_indexer, args
             decoder_embeds = prep_word_for_decoder(expected_output.unsqueeze(0), model_output_emb)
             output_len = output_lens_device[example]
             output_probs = torch.zeros((output_len, len(output_indexer))).to(device)
-
+#             import pdb; pdb.set_trace()
+            if example % 250 == 0:
+                print([input_indexer.get_object(word_indexes[0][idx].item()) for idx in range(output_len)])
             for i in range(output_len):
                 if i == 0:
                     embedded_word = start_token
@@ -242,10 +237,14 @@ def train_model_encdec(train_data, dev_data, input_indexer, output_indexer, args
                 else:
                     embedded_word = decoder_embeds[:, i - 1, :].unsqueeze(0)
                     token_out = model_dec(model_dec.hidden, embedded_word, enc_output_each_word)
-
+                if example % 250 == 0:
+                    print(output_indexer.get_object(torch.argmax(token_out).item()), end=' ')
                 output_probs[i, :] = token_out
+            if example % 250 == 0:
+                print('\n')
 
             loss = torch.nn.NLLLoss()
+#             import pdb; pdb.set_trace()
             loss_value = loss(output_probs, expected_output[:output_len])
             total_loss += loss_value.item()
 
@@ -280,7 +279,7 @@ def evaluate(test_data, decoder, example_freq=50, print_output=True, outfile=Non
     all_bleu_score = 0.
     total_tokens = 0
     
-    references = [ex.y_tok[:-1] for i, ex in enumerate(test_data)]
+    references = [[ex.y_tok[:-1]] for i, ex in enumerate(test_data)]
     predictions = [None] * len(references)
     
     for i, ex in enumerate(test_data):
@@ -306,6 +305,7 @@ def evaluate(test_data, decoder, example_freq=50, print_output=True, outfile=Non
         
 #     bleu_score = sentence_bleu([gt], pred_derivations[i][0].y_toks, weights=(0.25, 0.25, 0.25, 0.25))
 #     all_bleu_score += bleu_score
+#     import pdb; pdb.set_trace()
     bleu_score = corpus_bleu(references, predictions)
 
     print("Exact logical form matches: %s" % (render_ratio(num_exact_match, len(test_data))))
@@ -331,7 +331,7 @@ if __name__ == '__main__':
     np.random.seed(args.seed)
     # Load the training and test data
     
-    kjv, esv = load_bibles(args.kjv, args.esv)
+    kjv, esv = load_bibles(args.kjv, args.esv, args.category)
     train, dev, test = load_datasets(args.train_path, args.dev_path, args.test_path, kjv)
 #     limit = 5000
 #     train = train[:limit]
