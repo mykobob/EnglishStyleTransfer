@@ -197,7 +197,7 @@ def train_model_encdec(train_data, dev_data, input_indexer, output_indexer, args
     epochs = args.epochs
     model_dec = RNNDecoder(args.input_dim, model_enc.get_output_size(), args.hidden_size, len(output_indexer),
                            args.rnn_dropout).to(device)
-    lm_weight = torch.FloatTensor([0.5])
+    lm_weight = torch.FloatTensor([0.5]).to(device)
     optimizer = optim.Adam(
         list(model_enc.parameters()) + list(model_dec.parameters()) + list(model_input_emb.parameters()) + list(
             model_output_emb.parameters()) + list(lm_weight), lr=args.lr)
@@ -250,7 +250,7 @@ def train_model_encdec(train_data, dev_data, input_indexer, output_indexer, args
             # incorporate language models here
             # print('expected output and shape', expected_output, expected_output.shape)
             # print('output probs and shape', output_probs, output_probs.shape)
-            lm_distribution = kenlm_distribution(expected_output, output_len, output_indexer, lm)
+            lm_distribution = kenlm_distribution(expected_output, output_len, output_indexer, lm).to(device)
             # print('lm distribution and shape', lm_distribution, lm_distribution.shape)
             # for i in range(len(output_indexer)):
             #     print(output_indexer.get_object(i), end=" ")
