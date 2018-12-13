@@ -246,7 +246,12 @@ def train_model_encdec(train_data, dev_data, input_indexer, output_indexer, args
             loss = torch.nn.NLLLoss()
 #             import pdb; pdb.set_trace()
             # incorporate language models here
-            print(expected_output)
+            print('expected output and shape', expected_output, expected_output.shape)
+            print('output probs and shape', output_probs, output_probs.shape)
+            lm_distribution = kenlm_distribution(expected_output, output_len, output_indexer, lm)
+            print('lm distribution and shape', lm_distribution, lm_distribution.shape)
+            # for i in range(len(output_indexer)):
+            #     print(output_indexer.get_object(i), end=" ")
             input()
             loss_value = loss(output_probs, expected_output[:output_len])
             total_loss += loss_value.item()
