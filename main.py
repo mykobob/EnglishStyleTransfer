@@ -125,10 +125,11 @@ class Seq2SeqSemanticParser(object):
                         if output_idx > 105:
                             break
                     if self.args.use_rnnlm:
-                        sentence_idxs = torch.tensor(test_tokens_idx).unsqueeze(0).to(device)
-                        sentence_lens = torch.tensor(len(test_tokens_idx)).unsqueeze(0).to(device)
+                        sentence_idxs = torch.tensor(test_tokens_idx if len(test_tokens_idx) > 0 else [self.output_indexer.get_index("<SOV>")]).unsqueeze(0).to(device)
+                        sentence_lens = torch.tensor(len(test_tokens_idx) if len(test_tokens_idx) > 0 else 1).unsqueeze(0).to(device)
 #                    lm_distribution = rnnlm_distribution(sentence_idxs, sentence_lens, lm).squeeze()
-                        tmp_lm_distribution = rnnlm_distribution(sentence_idxs, sentence_lens, lm).squeeze()
+                        tmp_lm_distribution = rnnlm_distribution(sentence_idxs, sentence_lens, lm).squeeze(dim=0)
+                        print("tmp distro", tmp_lm_distribution, tmp_lm_distribution.shape)
                         lm_distribution = torch.FloatTensor(size=(tmp_lm_distribution.shape[0], tmp_lm_distribution.shape[1]-1)).to(device)
                         for i in range(lm_distribution.shape[0]):
                             lm_distribution[i] = torch.cat((tmp_lm_distribution[i][:1], tmp_lm_distribution[i][2:]))
@@ -389,6 +390,8 @@ if __name__ == '__main__':
     # load language model
     if args.use_rnnlm:
         lm = get_rnnlm(args.model_path)
+        for p in lm.parameters():
+            p.requires_grad = False
     else:
         lm = get_kenlm('data/esv_tokens.txt.arpa')
     print("%i train exs, %i dev exs, %i input types, %i output types" % (
