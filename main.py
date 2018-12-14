@@ -264,10 +264,16 @@ def train_model_encdec(train_data, dev_data, input_indexer, output_indexer, args
 
             # incorporate language models here
             if args.use_rnnlm:
-                sentence_idxs = expected_output[:output_len].to(device)
-                sentence_lens = torch.tensor([output_len]).unsqueeze(0).to(device)
-                lm_distribution = rnnlm_distribution(sentence_idxs, sentence_lens, lm)
+                sentence_idxs = expected_output[:output_len].unsqueeze(0).to(device)
+                sentence_lens = torch.tensor(output_len).unsqueeze(0).to(device)
+                lm_distribution = rnnlm_distribution(sentence_idxs, sentence_lens, lm).squeeze()
+#                tmp_lm_distribution = rnnlm_distribution(sentence_idxs, sentence_lens, lm).squeeze()
+#                lm_distribution = torch.FloatTensor(size=(tmp_lm_distribution.shape[0], tmp_lm_distribution.shape[1]-1)).to(device)
+#                for i in range(lm_distribution.shape[0]):
+#                    lm_distribution[i] = tmp_lm_distribution[i][:-1]
                 print("rnnlm distro", lm_distribution, lm_distribution.shape)
+                print("output probs", output_probs, output_probs.shape)
+                input()
             else:
                 lm_distribution = kenlm_distribution(expected_output, output_len, output_indexer, lm).to(device)
             output_probs = output_probs * lm_weight + lm_distribution * (1 - lm_weight)
@@ -366,7 +372,7 @@ if __name__ == '__main__':
                                                                                                             test, args.decoder_len_limit)
     # load language model
     if args.use_rnnlm:
-        lm = get_rnnlm()
+        lm = get_rnnlm(args.model_path)
     else:
         lm = get_kenlm('data/esv_tokens.txt.arpa')
     print("%i train exs, %i dev exs, %i input types, %i output types" % (

@@ -307,8 +307,8 @@ def kenlm_decode_dist(predicted_output_sentence, output_indexer, model):
     return F.log_softmax(torch.from_numpy(score_distribution)).float()
 
 
-def get_rnnlm():
-    with open('best_model.pt', 'rb') as f:
+def get_rnnlm(path):
+    with open(path, 'rb') as f:
         model = torch.load(f)
         model.rnn.flatten_parameters()
     return model
