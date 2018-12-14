@@ -9,6 +9,7 @@ from models import *
 from data import *
 from read_bible import *
 from utils import *
+import pickle
 
 from nltk.translate.bleu_score import corpus_bleu, SmoothingFunction
 
@@ -55,7 +56,7 @@ def _parse_args():
 
 
 class Seq2SeqSemanticParser(object):
-    def __init__(self, encoder, input_embed, output_embed, decoder, input_indexer, output_indexer, lm, lm_weight):
+    def __init__(self, encoder, input_embed, output_embed, decoder, input_indexer, output_indexer, lm, lm_weight, args):
         # Add any args you need here
         self.encoder = encoder
         self.model_input_embed = input_embed
@@ -65,6 +66,7 @@ class Seq2SeqSemanticParser(object):
         self.output_indexer = output_indexer
         self.lm = lm
         self.lm_weight = lm_weight
+        self.args = args
 
     def start_token(self):
         return self.output_indexer.index_of(SOV_SYMBOL)
@@ -122,8 +124,17 @@ class Seq2SeqSemanticParser(object):
                     else:
                         if output_idx > 105:
                             break
-                    predicted_sentence = " ".join([self.output_indexer.get_object(idx.item()) for idx in test_tokens_idx])
-                    lm_distribution = kenlm_decode_dist(predicted_sentence, self.output_indexer, lm)
+                    if self.args.use_rnnlm:
+                        sentence_idxs = expected_output[:output_len].unsqueeze(0).to(device)
+                        sentence_lens = torch.tensor(output_len).unsqueeze(0).to(device)
+#                    lm_distribution = rnnlm_distribution(sentence_idxs, sentence_lens, lm).squeeze()
+                        tmp_lm_distribution = rnnlm_distribution(sentence_idxs, sentence_lens, lm).squeeze()
+                        lm_distribution = torch.FloatTensor(size=(tmp_lm_distribution.shape[0], tmp_lm_distribution.shape[1]-1)).to(device)
+                        for i in range(lm_distribution.shape[0]):
+                            lm_distribution[i] = torch.cat((tmp_lm_distribution[i][:1], tmp_lm_distribution[i][2:]))
+                    else:
+                        predicted_sentence = " ".join([self.output_indexer.get_object(idx.item()) for idx in test_tokens_idx])
+                        lm_distribution = kenlm_decode_dist(predicted_sentence, self.output_indexer, lm)
                     output_probs = output_probs * lm_weight + lm_distribution * (1 - lm_weight)
                     prediction_idx = torch.argmax(output_probs)
                     # Feed in predicted value into next lstm cell
@@ -266,14 +277,19 @@ def train_model_encdec(train_data, dev_data, input_indexer, output_indexer, args
             if args.use_rnnlm:
                 sentence_idxs = expected_output[:output_len].unsqueeze(0).to(device)
                 sentence_lens = torch.tensor(output_len).unsqueeze(0).to(device)
-                lm_distribution = rnnlm_distribution(sentence_idxs, sentence_lens, lm).squeeze()
-#                tmp_lm_distribution = rnnlm_distribution(sentence_idxs, sentence_lens, lm).squeeze()
-#                lm_distribution = torch.FloatTensor(size=(tmp_lm_distribution.shape[0], tmp_lm_distribution.shape[1]-1)).to(device)
-#                for i in range(lm_distribution.shape[0]):
-#                    lm_distribution[i] = tmp_lm_distribution[i][:-1]
-                print("rnnlm distro", lm_distribution, lm_distribution.shape)
-                print("output probs", output_probs, output_probs.shape)
-                input()
+#                lm_distribution = rnnlm_distribution(sentence_idxs, sentence_lens, lm).squeeze()
+                tmp_lm_distribution = rnnlm_distribution(sentence_idxs, sentence_lens, lm).squeeze()
+                lm_distribution = torch.FloatTensor(size=(tmp_lm_distribution.shape[0], tmp_lm_distribution.shape[1]-1)).to(device)
+                for i in range(lm_distribution.shape[0]):
+                    lm_distribution[i] = torch.cat((tmp_lm_distribution[i][:1], tmp_lm_distribution[i][2:]))
+#                print("rnnlm distro", lm_distribution, lm_distribution.shape)
+#                print("output probs", output_probs, output_probs.shape)
+#                with open('esv_luke_acts_indexer.obj', 'rb') as f:
+#                    lm_indexer = pickle.load(f)
+#                for n in range(len(lm_indexer)):
+#                    if not output_indexer.contains(lm_indexer.get_object(n)):
+#                        print(lm_indexer.get_object(n), n)
+#                input()
             else:
                 lm_distribution = kenlm_distribution(expected_output, output_len, output_indexer, lm).to(device)
             output_probs = output_probs * lm_weight + lm_distribution * (1 - lm_weight)
@@ -293,7 +309,7 @@ def train_model_encdec(train_data, dev_data, input_indexer, output_indexer, args
         print(f'Epoch {epoch+1} done. Loss: {total_loss:.2f}. It took {time.time() - start} seconds')
         print(f'Total correct: {total_correct}/{total_tokens}')
         parser = Seq2SeqSemanticParser(model_enc, model_input_emb, model_output_emb, model_dec, input_indexer,
-                                       output_indexer, lm, lm_weight)
+                                       output_indexer, lm, lm_weight, args)
         if epoch % 4 == 0:
             evaluate(dev_data, parser)
         # print()
