@@ -104,7 +104,7 @@ class Seq2SeqSemanticParser(object):
 
                 # Decode here
                 input_token = torch.tensor((self.start_token())).to(device)
-                test_tokens_idx = []
+                test_tokens_idx = [input_token.item()]
                 prediction_score = 0.
                 output_idx = 0
 
@@ -128,10 +128,11 @@ class Seq2SeqSemanticParser(object):
                         sentence_idxs = torch.tensor(test_tokens_idx).unsqueeze(0).to(device)
                         sentence_lens = torch.tensor(len(test_tokens_idx)).unsqueeze(0).to(device)
 #                    lm_distribution = rnnlm_distribution(sentence_idxs, sentence_lens, lm).squeeze()
-                        tmp_lm_distribution = rnnlm_distribution(sentence_idxs, sentence_lens, lm).squeeze()
-                        lm_distribution = torch.FloatTensor(size=(tmp_lm_distribution.shape[0], tmp_lm_distribution.shape[1]-1)).to(device)
-                        for i in range(lm_distribution.shape[0]):
-                            lm_distribution[i] = torch.cat((tmp_lm_distribution[i][:1], tmp_lm_distribution[i][2:]))
+                        tmp_lm_distribution = rnnlm_distribution(sentence_idxs, sentence_lens, lm).squeeze(0)
+                        # import pdb; pdb.set_trace()
+                        # lm_distribution = torch.FloatTensor(size=(tmp_lm_distribution.shape[1]-1)).to(device)
+                        # for i in range(lm_distribution.shape[0]):
+                        lm_distribution = torch.cat((tmp_lm_distribution[-1][:1], tmp_lm_distribution[-1][2:])).to(device)
                     else:
                         predicted_sentence = " ".join([self.output_indexer.get_object(idx.item()) for idx in test_tokens_idx])
                         lm_distribution = kenlm_decode_dist(predicted_sentence, self.output_indexer, lm)
@@ -140,6 +141,7 @@ class Seq2SeqSemanticParser(object):
                     # Feed in predicted value into next lstm cell
                     output_idx += 1
                     input_token = prediction_idx
+                    # import pdb; pdb.set_trace()
 
                     test_tokens_idx.append(prediction_idx.item())
                 test_tokens_idx = test_tokens_idx[:-1]
@@ -389,6 +391,8 @@ if __name__ == '__main__':
     # load language model
     if args.use_rnnlm:
         lm = get_rnnlm(args.model_path)
+        for p in lm.parameters():
+            p.requires_grad = False
     else:
         lm = get_kenlm('data/esv_tokens.txt.arpa')
     print("%i train exs, %i dev exs, %i input types, %i output types" % (

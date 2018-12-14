@@ -5,8 +5,8 @@ from main import *
 
 import argparse
 
-def save(kjv_path, esv_path, kjv_data_path, esv_data_path):
-    kjv, esv = load_bibles(kjv_path, esv_path, 'epistles')
+def save(kjv_path, esv_path, kjv_data_path, esv_data_path, category):
+    kjv, esv = load_bibles(kjv_path, esv_path, category)
     train_refs, dev_refs, test_refs = split_dataset(kjv, 80, 10, 10)
     with open('{}_train.csv'.format(kjv_data_path), "w") as f:
         for ref in train_refs:
@@ -40,5 +40,6 @@ if __name__ == '__main__':
     parser.add_argument('--esv_path', required=True)
     parser.add_argument('--kjv_data_path', required=True)
     parser.add_argument('--esv_data_path', required=True)
+    parser.add_argument('--category', required=True)
     args = parser.parse_args()
-    save(args.kjv_path, args.esv_path, args.kjv_data_path, args.esv_data_path)
+    save(args.kjv_path, args.esv_path, args.kjv_data_path, args.esv_data_path, args.category)
