@@ -51,7 +51,7 @@ def _parse_args():
 
 
 class Seq2SeqSemanticParser(object):
-    def __init__(self, encoder, input_embed, output_embed, decoder, input_indexer, output_indexer):
+    def __init__(self, encoder, input_embed, output_embed, decoder, input_indexer, output_indexer, lm, lm_weight):
         # Add any args you need here
         self.encoder = encoder
         self.model_input_embed = input_embed
@@ -59,6 +59,8 @@ class Seq2SeqSemanticParser(object):
         self.decoder = decoder
         self.input_indexer = input_indexer
         self.output_indexer = output_indexer
+        self.lm = lm
+        self.lm_weight = lm_weight
 
     def start_token(self):
         return self.output_indexer.index_of(SOV_SYMBOL)
@@ -79,8 +81,10 @@ class Seq2SeqSemanticParser(object):
         self.decoder.eval()
 
 # TODO rewrite end derivation code
-    def decode(self, test_data, lm):
+    def decode(self, test_data):
         # loop through test_data (maybe in batches)
+        lm = self.lm
+        lm_weight = self.lm_weight
         self.toggle_decoding()
 
         with torch.no_grad():
@@ -114,7 +118,9 @@ class Seq2SeqSemanticParser(object):
                     else:
                         if output_idx > 105:
                             break
-
+                    predicted_sentence = " ".join([self.output_indexer.get_object(idx.item()) for idx in test_tokens_idx])
+                    lm_distribution = kenlm_decode_dist(predicted_sentence, self.output_indexer, lm)
+                    output_prob = output_prob * lm_weight + lm_distribution * (1 - lm_weight)
                     prediction_idx = torch.argmax(output_probs)
                     # Feed in predicted value into next lstm cell
                     output_idx += 1
@@ -271,7 +277,7 @@ def train_model_encdec(train_data, dev_data, input_indexer, output_indexer, args
         print(f'Epoch {epoch+1} done. Loss: {total_loss:.2f}. It took {time.time() - start} seconds')
         print(f'Total correct: {total_correct}/{total_tokens}')
         parser = Seq2SeqSemanticParser(model_enc, model_input_emb, model_output_emb, model_dec, input_indexer,
-                                       output_indexer)
+                                       output_indexer, lm, lm_weight)
         if epoch % 4 == 0:
             evaluate(dev_data, parser)
         # print()
@@ -279,7 +285,7 @@ def train_model_encdec(train_data, dev_data, input_indexer, output_indexer, args
 
 
 # TODO Rewrite this to do BLEU score or compare against correct translation
-def evaluate(test_data, decoder, example_freq=50, print_output=True, outfile=None, lm=None):
+def evaluate(test_data, decoder, example_freq=50, print_output=True, outfile=None):
     pred_derivations = decoder.decode(test_data)
     # list of the same size as test data
     # Derivation object
@@ -361,7 +367,7 @@ if __name__ == '__main__':
     print("=======FINAL EVALUATION=======")
     # evaluate(test_data_indexed, decoder, outfile="geo_test_output.tsv")
     eval_time = time.time()
-    evaluate(test_data_indexed, decoder, print_output=True, outfile="geo_test_output.tsv", lm=lm)
+    evaluate(test_data_indexed, decoder, print_output=True, outfile="geo_test_output.tsv")
     print(f'Evaluation took {time.time() - eval_time} seconds')
 
 

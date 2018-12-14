@@ -299,6 +299,13 @@ def kenlm_distribution(expected_output, length, output_indexer, model):
                                                    output_indexer.get_object(k))
     return F.log_softmax(torch.from_numpy(score_distribution), dim=1).float()
 
+
+def kenlm_decode_dist(predicted_output_sentence, output_indexer, model):
+    score_distribution = np.zeros((len(output_indexer)))
+    for i in range(len(output_indexer)):
+        score_distribution[i] = model.score(predicted_output_sentence + output_indexer.get_object(i))
+    return F.log_softmax(torch.from_numpy(score_distribution)).float()
+
 ###################################
 #        Stop from main.py        #
 ###################################
