@@ -310,7 +310,7 @@ for i in range(len(sentence)):
         print('Expected: <EOV>. Predicted:', indexer.get_object(torch.argmax(output[0][i]).item()))
     print()
 
-
+import pdb; pdb.set_trace()
 
 if len(args.onnx_export) > 0:
     # Export the model in ONNX format.
