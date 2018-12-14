@@ -291,7 +291,7 @@ def get_kenlm(path):
 def kenlm_distribution(expected_output, length, output_indexer, model):
     score_distribution = np.zeros((length, len(output_indexer)))
     correct_tokens = [output_indexer.get_object(idx.item()) for idx in expected_output[:length]]
-    print('correct tokens', correct_tokens)
+    # print('correct tokens', correct_tokens)
     for i in range(length):
         correct_prev_string = " ".join(correct_tokens[:i]) if i>0 else ''
         for k in range(len(output_indexer)):

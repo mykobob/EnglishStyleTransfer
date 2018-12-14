@@ -284,7 +284,6 @@ def train_model_encdec(train_data, dev_data, input_indexer, output_indexer, args
     return parser
 
 
-# TODO Rewrite this to do BLEU score or compare against correct translation
 def evaluate(test_data, decoder, example_freq=50, print_output=True, outfile=None):
     pred_derivations = decoder.decode(test_data)
     # list of the same size as test data
