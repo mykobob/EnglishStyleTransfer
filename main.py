@@ -125,8 +125,8 @@ class Seq2SeqSemanticParser(object):
                         if output_idx > 105:
                             break
                     if self.args.use_rnnlm:
-                        sentence_idxs = torch.tensor(test_tokens_idx).unsqueeze(0).to(device)
-                        sentence_lens = torch.tensor(len(test_tokens_idx)).unsqueeze(0).to(device)
+                        sentence_idxs = torch.tensor(test_tokens_idx if len(test_tokens_idx) > 0 else [self.output_indexer.get_index("<SOV>")]).unsqueeze(0).to(device)
+                        sentence_lens = torch.tensor(len(test_tokens_idx) if len(test_tokens_idx) > 0 else 1).unsqueeze(0).to(device)
 #                    lm_distribution = rnnlm_distribution(sentence_idxs, sentence_lens, lm).squeeze()
                         tmp_lm_distribution = rnnlm_distribution(sentence_idxs, sentence_lens, lm).squeeze(0)
                         # import pdb; pdb.set_trace()
