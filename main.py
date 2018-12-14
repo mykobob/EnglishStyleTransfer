@@ -12,7 +12,6 @@ from utils import *
 
 from nltk.translate.bleu_score import corpus_bleu, SmoothingFunction
 
-device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
 def _parse_args():
     parser = argparse.ArgumentParser(description='main.py')
@@ -45,6 +44,7 @@ def _parse_args():
     
     parser.add_argument('--esv', type=str)
     parser.add_argument('--kjv', type=str)
+    parser.add_argument('--gpu', type=str, default='0')
 
     args = parser.parse_args()
     return args
@@ -120,7 +120,7 @@ class Seq2SeqSemanticParser(object):
                             break
                     predicted_sentence = " ".join([self.output_indexer.get_object(idx.item()) for idx in test_tokens_idx])
                     lm_distribution = kenlm_decode_dist(predicted_sentence, self.output_indexer, lm)
-                    output_prob = output_prob * lm_weight + lm_distribution * (1 - lm_weight)
+                    output_probs = output_probs * lm_weight + lm_distribution * (1 - lm_weight)
                     prediction_idx = torch.argmax(output_probs)
                     # Feed in predicted value into next lstm cell
                     output_idx += 1
@@ -207,6 +207,9 @@ def train_model_encdec(train_data, dev_data, input_indexer, output_indexer, args
     optimizer = optim.Adam(
         list(model_enc.parameters()) + list(model_dec.parameters()) + list(model_input_emb.parameters()) + list(
             model_output_emb.parameters()) + list(lm_weight), lr=args.lr)
+#    optimizer = optim.Adam(
+#        list(model_enc.parameters()) + list(model_dec.parameters()) + list(model_input_emb.parameters()) + list(
+#            model_output_emb.parameters()), lr=args.lr)
 
     start_token = torch.tensor((output_indexer.index_of(SOV_SYMBOL))).to(device)
 
@@ -341,6 +344,7 @@ def render_ratio(numer, denom):
 
 if __name__ == '__main__':
     args = _parse_args()
+    device = torch.device("cuda:" + args.gpu if torch.cuda.is_available() else "cpu")
     print(args)
     random.seed(args.seed)
     np.random.seed(args.seed)
