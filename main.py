@@ -39,12 +39,16 @@ def _parse_args():
     parser.add_argument('--emb_dropout', type=float, default=0.3)
     parser.add_argument('--rnn_dropout', type=float, default=0.5)
     parser.add_argument('--bidirectional', type=bool, default=True)
+    parser.add_argument('--learn_weights', type=bool, default=False)
+    parser.add_argument('--use_rnnlm', type=bool, default=False)
     
     parser.add_argument('--category', default='luke_acts')
     
     parser.add_argument('--esv', type=str)
     parser.add_argument('--kjv', type=str)
     parser.add_argument('--gpu', type=str, default='0')
+    parser.add_argument('--model_path')
+    parser.add_argument('--indexer_path')
 
     args = parser.parse_args()
     return args
@@ -204,12 +208,14 @@ def train_model_encdec(train_data, dev_data, input_indexer, output_indexer, args
     model_dec = RNNDecoder(args.input_dim, model_enc.get_output_size(), args.hidden_size, len(output_indexer),
                            args.rnn_dropout).to(device)
     lm_weight = torch.FloatTensor([0.5]).to(device)
-    optimizer = optim.Adam(
-        list(model_enc.parameters()) + list(model_dec.parameters()) + list(model_input_emb.parameters()) + list(
-            model_output_emb.parameters()) + list(lm_weight), lr=args.lr)
-#    optimizer = optim.Adam(
-#        list(model_enc.parameters()) + list(model_dec.parameters()) + list(model_input_emb.parameters()) + list(
-#            model_output_emb.parameters()), lr=args.lr)
+    if args.learn_weights:
+        optimizer = optim.Adam(
+            list(model_enc.parameters()) + list(model_dec.parameters()) + list(model_input_emb.parameters()) + list(
+                model_output_emb.parameters()) + list(lm_weight), lr=args.lr)
+    else:
+        optimizer = optim.Adam(
+            list(model_enc.parameters()) + list(model_dec.parameters()) + list(model_input_emb.parameters()) + list(
+                model_output_emb.parameters()), lr=args.lr)
 
     start_token = torch.tensor((output_indexer.index_of(SOV_SYMBOL))).to(device)
 
@@ -257,12 +263,13 @@ def train_model_encdec(train_data, dev_data, input_indexer, output_indexer, args
 #             import pdb; pdb.set_trace()
 
             # incorporate language models here
-            # print('expected output and shape', expected_output, expected_output.shape)
-            # print('output probs and shape', output_probs, output_probs.shape)
-            lm_distribution = kenlm_distribution(expected_output, output_len, output_indexer, lm).to(device)
-            # print('lm distribution and shape', lm_distribution, lm_distribution.shape)
-            # for i in range(len(output_indexer)):
-            #     print(output_indexer.get_object(i), end=" ")
+            if args.use_rnnlm:
+                sentence_idxs = expected_output[:output_len].to(device)
+                sentence_lens = torch.tensor([output_len]).unsqueeze(0).to(device)
+                lm_distribution = rnnlm_distribution(sentence_idxs, sentence_lens, lm)
+                print("rnnlm distro", lm_distribution, lm_distribution.shape)
+            else:
+                lm_distribution = kenlm_distribution(expected_output, output_len, output_indexer, lm).to(device)
             output_probs = output_probs * lm_weight + lm_distribution * (1 - lm_weight)
             loss_value = loss(output_probs, expected_output[:output_len])
             total_loss += loss_value.item()
@@ -358,7 +365,10 @@ if __name__ == '__main__':
     train_data_indexed, dev_data_indexed, test_data_indexed, input_indexer, output_indexer = index_datasets(kjv, esv, train, dev,
                                                                                                             test, args.decoder_len_limit)
     # load language model
-    lm = get_kenlm('data/esv_tokens.txt.arpa')
+    if args.use_rnnlm:
+        lm = get_rnnlm()
+    else:
+        lm = get_kenlm('data/esv_tokens.txt.arpa')
     print("%i train exs, %i dev exs, %i input types, %i output types" % (
     len(train_data_indexed), len(dev_data_indexed), len(input_indexer), len(output_indexer)))
     # print("Input indexer: %s" % input_indexer)

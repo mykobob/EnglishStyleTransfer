@@ -306,6 +306,18 @@ def kenlm_decode_dist(predicted_output_sentence, output_indexer, model):
         score_distribution[i] = model.score(predicted_output_sentence + output_indexer.get_object(i))
     return F.log_softmax(torch.from_numpy(score_distribution)).float()
 
+
+def get_rnnlm():
+    with open('best_model.pt', 'rb') as f:
+        model = torch.load(f)
+        model.rnn.flatten_parameters()
+    return model
+
+
+def rnnlm_distribution(sentence_idxs, sentence_lens, model):
+    hidden = model.init_hidden(1)
+    output, hidden = model(sentence_idxs, sentence_lens, hidden)
+    return output
 ###################################
 #        Stop from main.py        #
 ###################################
