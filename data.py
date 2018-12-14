@@ -153,7 +153,6 @@ def index_dataset(text, train, dev, test, example_len_limit, unk_threshold=0.0):
     # Reserve 0 for the pad symbol for convenience
     indexer.get_index(PAD_SYMBOL)
     indexer.get_index(UNK_SYMBOL)
-    indexer.get_index(PAD_SYMBOL)
     indexer.get_index(SOV_SYMBOL)
     indexer.get_index(EOV_SYMBOL)
     # Index all input words above the UNK threshold
